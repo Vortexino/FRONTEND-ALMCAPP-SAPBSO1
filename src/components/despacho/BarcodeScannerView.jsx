@@ -1,13 +1,12 @@
 import { useEffect, useRef } from 'react';
-import { Modal, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { Button, Text } from 'react-native-paper';
+import { C, S } from '../../constants/theme';
 
 const TIPOS_CODIGO = ['qr', 'code128', 'code39', 'ean13', 'ean8', 'upc_a', 'upc_e'];
 
-// Componente reutilizable de escaneo: lo usa tanto el buscador de
-// DespachoListScreen (código de barras del papel físico) como el picking
-// guiado de DespachoDetailScreen (escaneo de artículos).
 export default function BarcodeScannerView({ visible, onClose, onScanned, title = 'Escanear código' }) {
   const [permission, requestPermission] = useCameraPermissions();
   const bloqueado = useRef(false);
@@ -28,16 +27,23 @@ export default function BarcodeScannerView({ visible, onClose, onScanned, title 
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={styles.container}>
         {!permission?.granted ? (
-          <View style={styles.permisoContainer}>
-            <Text variant="bodyLarge" style={styles.permisoTexto}>
-              Se necesita acceso a la cámara para escanear códigos.
+          <View style={styles.permisoWrap}>
+            <View style={styles.permisoIconCircle}>
+              <MaterialCommunityIcons name="camera-off" size={32} color={C.textMuted} />
+            </View>
+            <Text style={styles.permisoTitulo}>Acceso a la cámara</Text>
+            <Text style={styles.permisoDesc}>
+              Necesitamos permiso para escanear los códigos de barras.
             </Text>
-            <Button mode="contained" onPress={requestPermission} style={styles.boton}>
-              Conceder permiso
-            </Button>
-            <Button mode="text" onPress={onClose}>
-              Cancelar
-            </Button>
+            <Pressable
+              onPress={requestPermission}
+              style={({ pressed }) => [styles.permisoBtn, pressed && { opacity: 0.8 }]}
+            >
+              <Text style={styles.permisoBtnLabel}>Conceder acceso</Text>
+            </Pressable>
+            <Pressable onPress={onClose} style={({ pressed }) => [pressed && { opacity: 0.65 }]}>
+              <Text style={styles.cancelarLink}>Cancelar</Text>
+            </Pressable>
           </View>
         ) : (
           <>
@@ -46,13 +52,31 @@ export default function BarcodeScannerView({ visible, onClose, onScanned, title 
               barcodeScannerSettings={{ barcodeTypes: TIPOS_CODIGO }}
               onBarcodeScanned={handleScan}
             />
+
+            {/* Mira de escaneo */}
+            <View style={StyleSheet.absoluteFill} pointerEvents="none">
+              <View style={styles.miraCentro}>
+                <View style={styles.miraBox}>
+                  {/* Esquinas */}
+                  <View style={[styles.esquina, styles.esqTopLeft]} />
+                  <View style={[styles.esquina, styles.esqTopRight]} />
+                  <View style={[styles.esquina, styles.esqBottomLeft]} />
+                  <View style={[styles.esquina, styles.esqBottomRight]} />
+                </View>
+              </View>
+            </View>
+
+            {/* Overlay inferior */}
             <View style={styles.overlay}>
-              <Text variant="titleMedium" style={styles.overlayTexto}>
-                {title}
-              </Text>
-              <Button mode="contained" onPress={onClose} style={styles.boton}>
-                Cancelar
-              </Button>
+              <Text style={styles.overlayTitulo}>{title}</Text>
+              <Text style={styles.overlayHint}>Alineá el código dentro del recuadro</Text>
+              <Pressable
+                onPress={onClose}
+                style={({ pressed }) => [styles.cerrarBtn, pressed && { opacity: 0.75 }]}
+              >
+                <MaterialCommunityIcons name="close" size={18} color={C.text} />
+                <Text style={styles.cerrarBtnLabel}>Cancelar</Text>
+              </Pressable>
             </View>
           </>
         )}
@@ -61,20 +85,81 @@ export default function BarcodeScannerView({ visible, onClose, onScanned, title 
   );
 }
 
+const CORNER = 22;
+const BORDER_W = 3;
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   camera: { flex: 1 },
+
+  // Mira
+  miraCentro: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  miraBox: { width: 240, height: 180, position: 'relative' },
+  esquina: {
+    position: 'absolute',
+    width: CORNER,
+    height: CORNER,
+    borderColor: '#fff',
+  },
+  esqTopLeft:     { top: 0,  left: 0,  borderTopWidth: BORDER_W, borderLeftWidth: BORDER_W,   borderTopLeftRadius: 6 },
+  esqTopRight:    { top: 0,  right: 0, borderTopWidth: BORDER_W, borderRightWidth: BORDER_W,  borderTopRightRadius: 6 },
+  esqBottomLeft:  { bottom: 0, left: 0,  borderBottomWidth: BORDER_W, borderLeftWidth: BORDER_W,  borderBottomLeftRadius: 6 },
+  esqBottomRight: { bottom: 0, right: 0, borderBottomWidth: BORDER_W, borderRightWidth: BORDER_W, borderBottomRightRadius: 6 },
+
+  // Overlay inferior
   overlay: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    padding: 24,
+    paddingTop: S.xl,
+    paddingBottom: S.xxxl,
+    paddingHorizontal: S.xl,
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    gap: S.sm,
+    backgroundColor: 'rgba(15,26,46,0.72)',
   },
-  overlayTexto: { color: '#fff', marginBottom: 12 },
-  boton: { marginTop: 8, minWidth: 180 },
-  permisoContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
-  permisoTexto: { color: '#fff', textAlign: 'center' },
+  overlayTitulo: { color: '#fff', fontSize: 16, fontWeight: '700', textAlign: 'center' },
+  overlayHint: { color: 'rgba(255,255,255,0.6)', fontSize: 13, textAlign: 'center' },
+  cerrarBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: S.xs,
+    marginTop: S.sm,
+    backgroundColor: '#fff',
+    borderRadius: 50,
+    paddingHorizontal: S.xl,
+    paddingVertical: 11,
+  },
+  cerrarBtnLabel: { color: C.text, fontWeight: '700', fontSize: 14 },
+
+  // Permiso
+  permisoWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: C.bg,
+    padding: S.xl,
+    gap: S.md,
+  },
+  permisoIconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: C.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: S.sm,
+  },
+  permisoTitulo: { fontSize: 18, fontWeight: '700', color: C.text, textAlign: 'center' },
+  permisoDesc: { fontSize: 14, color: C.textSec, textAlign: 'center', lineHeight: 20 },
+  permisoBtn: {
+    backgroundColor: C.primary,
+    borderRadius: 14,
+    paddingHorizontal: S.xl,
+    paddingVertical: 13,
+    marginTop: S.sm,
+  },
+  permisoBtnLabel: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  cancelarLink: { fontSize: 14, color: C.textSec, fontWeight: '600', marginTop: S.xs },
 });

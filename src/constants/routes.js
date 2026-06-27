@@ -1,6 +1,17 @@
-// Nombres de rutas centralizados, acordados con el equipo (sección 7 del contexto).
-// Agregar aquí las rutas del módulo de Pedidos cuando se integre.
 export const ROUTES = {
+  // Auth
+  LOGIN: 'Login',
+
+  // Home
+  HOME: 'Home',
+  DASHBOARD: 'Dashboard',
+
+  // Pedidos
+  PEDIDOS_LIST: 'PedidosList',
+  PEDIDOS_DETAIL: 'PedidosDetail',
+  PEDIDOS_REVIEW: 'PedidosReview',
+
+  // Despacho
   DESPACHO_LIST: 'DespachoList',
   DESPACHO_DETAIL: 'DespachoDetail',
   DESPACHO_CONFIRM: 'DespachoConfirm',

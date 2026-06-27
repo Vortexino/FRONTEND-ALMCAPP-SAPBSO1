@@ -1,11 +1,25 @@
 import axios from 'axios';
+import * as SecureStore from 'expo-secure-store';
 
-// STUB temporal: el dueño real de este archivo es el módulo Login
-// (interceptor de token depende de authStore, que no existe todavía).
-// Ajustar baseURL al backend propio real y agregar el interceptor cuando se integre.
+// Cambiar esta IP por la IP local del servidor cuando se pruebe en dispositivo físico.
+// En emulador Android usar http://10.0.2.2:3000
+// En dispositivo físico usar la IP LAN del servidor, ej: http://192.168.1.100:3000
+export const BASE_URL = 'https://nonabstractly-interpetiolar-millard.ngrok-free.dev';
+
 const axiosClient = axios.create({
-  baseURL: 'http://localhost:3000/api',
+  baseURL: BASE_URL,
   timeout: 10000,
+  headers: {
+    'ngrok-skip-browser-warning': 'true',
+  },
+});
+
+axiosClient.interceptors.request.use(async (config) => {
+  const token = await SecureStore.getItemAsync('auth_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 export default axiosClient;

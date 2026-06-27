@@ -27,7 +27,8 @@
           "cameraPermission": "Esta app usa la cámara para escanear los códigos de barras de los artículos durante el despacho."
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-secure-store"
     ]
   }
 }
