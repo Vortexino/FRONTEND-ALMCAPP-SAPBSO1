@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import Toast from 'react-native-toast-message';
 import { usePedidos } from '../../hooks/usePedidos';
 import ItemAvailabilityRow from '../../components/pedidos/ItemAvailabilityRow';
 import BarcodeScannerView from '../../components/despacho/BarcodeScannerView';
+import HidScannerInput from '../../components/shared/HidScannerInput';
 import { ITEM_AVAILABILITY, ORDER_STATUS } from '../../store/pedidosStore';
 import { ROUTES } from '../../constants/routes';
 import { C, S, shadow } from '../../constants/theme';
@@ -16,11 +17,19 @@ export default function PedidosReviewScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const { orderId } = route.params ?? {};
-  const { orderActual, estadoUI, fetchOrder, escanearItem, actualizarItem, confirmarPedido, rechazarPedido } =
+  const { orderActual, estadoUI, user, fetchOrder, escanearItem, actualizarItem, confirmarPedido, rechazarPedido } =
     usePedidos();
   const [actionLoading, setActionLoading] = useState(false);
   const [scannerVisible, setScannerVisible] = useState(false);
   const [scanLoading, setScanLoading] = useState(false);
+  const hidRef = useRef(null);
+
+  // Vuelve a enfocar el scanner HID cuando se cierra el modal de cámara
+  useEffect(() => {
+    if (!scannerVisible) {
+      setTimeout(() => hidRef.current?.focus(), 150);
+    }
+  }, [scannerVisible]);
 
   useEffect(() => {
     if (!orderActual) fetchOrder(orderId);
@@ -103,7 +112,13 @@ export default function PedidosReviewScreen() {
 
   if (!orderActual) return null;
 
+  // Solo el dueño del lock puede confirmar o rechazar (backend valida con 409).
+  const lock = orderActual?.lock;
+  const lockOwner = lock?.lockedBy ?? lock?.userId ?? lock?.user_id ?? lock?.user ?? orderActual?.reviewed_by;
+  const esMiLock = !!lockOwner && lockOwner === user?.userId;
+
   const puedeConfirmar =
+    esMiLock &&
     !hayPendientes &&
     orderActual.status !== ORDER_STATUS.CONFIRMED &&
     orderActual.status !== ORDER_STATUS.REJECTED;
@@ -199,10 +214,10 @@ export default function PedidosReviewScreen() {
 
         <Pressable
           onPress={onRechazar}
-          disabled={actionLoading}
+          disabled={actionLoading || !esMiLock}
           style={({ pressed }) => [
             styles.btnRechazar,
-            actionLoading && { opacity: 0.45 },
+            (actionLoading || !esMiLock) && { opacity: 0.45 },
             pressed && { opacity: 0.75 },
           ]}
         >
@@ -210,6 +225,9 @@ export default function PedidosReviewScreen() {
           <Text style={styles.btnRechazarLabel}>Rechazar</Text>
         </Pressable>
       </View>
+
+      {/* Scanner HID: siempre activo en pantalla para scanners físicos Bluetooth/USB */}
+      <HidScannerInput inputRef={hidRef} onScanned={onCodigoEscaneado} />
 
       <BarcodeScannerView
         visible={scannerVisible}

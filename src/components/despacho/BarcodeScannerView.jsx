@@ -4,6 +4,7 @@ import { Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { C, S } from '../../constants/theme';
+import HidScannerInput from '../shared/HidScannerInput';
 
 const TIPOS_CODIGO = ['qr', 'code128', 'code39', 'ean13', 'ean8', 'upc_a', 'upc_e'];
 
@@ -47,6 +48,9 @@ export default function BarcodeScannerView({ visible, onClose, onScanned, title 
           </View>
         ) : (
           <>
+            {/* Scanner físico HID: captura input de teclado mientras el modal está abierto */}
+            <HidScannerInput onScanned={(code) => handleScan({ data: code })} />
+
             <CameraView
               style={styles.camera}
               barcodeScannerSettings={{ barcodeTypes: TIPOS_CODIGO }}

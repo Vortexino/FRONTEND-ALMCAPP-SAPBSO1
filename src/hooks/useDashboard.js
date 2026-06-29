@@ -7,6 +7,7 @@ const INITIAL_METRICS = {
   ordersByStatus: [],
   reviewTime:     [],
   dispatches:     [],
+  dispatchStatus: [],
   volume:         [],
   operators:      [],
   sessions:       [],

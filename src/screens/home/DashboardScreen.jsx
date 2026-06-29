@@ -30,21 +30,33 @@ function formatRelTime(iso) {
 
 // ── Transformaciones de datos ─────────────────────────────────────────────────
 const STATUS_COLORS = {
-  received:   C.primaryDim,
-  reviewing:  C.info,
-  confirmed:  C.success,
-  partial:    C.warn,
-  rejected:   C.danger,
-  dispatched: C.primary,
+  received:    C.primaryDim,
+  reviewing:   C.info,
+  confirmed:   C.success,
+  partial:     C.warn,
+  rejected:    C.danger,
+  dispatched:  C.primary,
 };
 
 const STATUS_LABELS = {
-  received:   'Recibida',
-  reviewing:  'En revisión',
-  confirmed:  'Confirmada',
-  partial:    'Parcial',
-  rejected:   'Rechazada',
-  dispatched: 'Despachada',
+  received:    'Recibida',
+  reviewing:   'En revisión',
+  confirmed:   'Confirmada',
+  partial:     'Parcial',
+  rejected:    'Rechazada',
+  dispatched:  'Despachada',
+};
+
+const DISPATCH_STATUS_COLORS = {
+  completed:   C.success,
+  in_progress: C.warn,
+  cancelled:   C.danger,
+};
+
+const DISPATCH_STATUS_LABELS = {
+  completed:   'Completados',
+  in_progress: 'En progreso',
+  cancelled:   'Cancelados',
 };
 
 function buildDonutData(rows) {
@@ -188,6 +200,39 @@ function SessionCard({ session }) {
   );
 }
 
+function DispatchStatusPill({ status, total }) {
+  const color = DISPATCH_STATUS_COLORS[status] ?? C.textSec;
+  const label = DISPATCH_STATUS_LABELS[status] ?? capitalize(status.replace('_', ' '));
+  return (
+    <View style={[styles.dsPill, { borderColor: color + '40', backgroundColor: color + '12' }]}>
+      <View style={[styles.dsPillDot, { backgroundColor: color }]} />
+      <View>
+        <Text style={[styles.dsPillTotal, { color }]}>{total}</Text>
+        <Text style={styles.dsPillLabel}>{label}</Text>
+      </View>
+    </View>
+  );
+}
+
+function DispatchStatsRow({ row, idx, last }) {
+  return (
+    <>
+      {idx > 0 && <View style={styles.tableDividerLight} />}
+      <View style={styles.dsRow}>
+        <View style={styles.opAvatar}>
+          <MaterialCommunityIcons name="account" size={14} color={C.primaryDim} />
+        </View>
+        <Text style={styles.dsUserId} numberOfLines={1}>{row.user_id}</Text>
+        <Text style={styles.dsStat}>{row.dispatches_completed}</Text>
+        <Text style={styles.dsStat}>
+          {row.avg_duration_minutes != null ? `${row.avg_duration_minutes.toFixed(1)}m` : '—'}
+        </Text>
+        <Text style={styles.dsStat}>{row.total_units_dispatched ?? '—'}</Text>
+      </View>
+    </>
+  );
+}
+
 function OperatorRow({ op }) {
   return (
     <View style={styles.opRow}>
@@ -212,7 +257,7 @@ export default function DashboardScreen() {
   const { metrics, warehouseFilter, changeWarehouse, isAdmin, user, loading, refreshing, error, onRefresh } =
     useDashboard();
 
-  const { summary, ordersByStatus, reviewTime, dispatches, volume, operators, sessions } = metrics;
+  const { summary, ordersByStatus, reviewTime, dispatches, dispatchStatus, volume, operators, sessions } = metrics;
 
   // Data calculada
   const donutData    = buildDonutData(ordersByStatus ?? []);
@@ -372,6 +417,37 @@ export default function DashboardScreen() {
           />
         )}
       </ChartCard>
+
+      {/* ── Estado de despachos ─────────────────────────────────────────── */}
+      {(dispatchStatus?.length ?? 0) > 0 && (
+        <>
+          <SeccionLabel>ESTADO DE DESPACHOS</SeccionLabel>
+          <View style={styles.dsPillRow}>
+            {dispatchStatus.map((ds) => (
+              <DispatchStatusPill key={ds.status} status={ds.status} total={ds.total} />
+            ))}
+          </View>
+        </>
+      )}
+
+      {/* ── Detalle de rendimiento por operador ─────────────────────────── */}
+      {(dispatches?.length ?? 0) > 0 && (
+        <>
+          <SeccionLabel>RENDIMIENTO POR OPERADOR</SeccionLabel>
+          <View style={[styles.tableCard, shadow.sm]}>
+            <View style={styles.tableHeader}>
+              <Text style={[styles.tableHeaderCell, { flex: 2 }]}>USUARIO</Text>
+              <Text style={styles.tableHeaderCell}>DESP.</Text>
+              <Text style={styles.tableHeaderCell}>PROM.</Text>
+              <Text style={styles.tableHeaderCell}>UNIADES</Text>
+            </View>
+            <View style={styles.tableDivider} />
+            {dispatches.map((row, idx) => (
+              <DispatchStatsRow key={row.user_id} row={row} idx={idx} last={idx === dispatches.length - 1} />
+            ))}
+          </View>
+        </>
+      )}
 
       {/* ── Tiempo de revisión ───────────────────────────────────────────── */}
       <SeccionLabel>TIEMPO PROMEDIO DE REVISIÓN</SeccionLabel>
@@ -588,6 +664,35 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   opErrorText: { fontSize: 10, fontWeight: '700', color: C.danger },
+
+  // Dispatch status pills
+  dsPillRow: { flexDirection: 'row', gap: S.md, flexWrap: 'wrap' },
+  dsPill: {
+    flex: 1,
+    minWidth: 90,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: S.sm,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: S.md,
+    paddingVertical: S.sm,
+    backgroundColor: C.surface,
+  },
+  dsPillDot: { width: 8, height: 8, borderRadius: 4 },
+  dsPillTotal: { fontSize: 20, fontWeight: '700', letterSpacing: -0.5 },
+  dsPillLabel: { fontSize: 10, fontWeight: '600', color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.3 },
+
+  // Dispatch stats table row
+  dsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: S.base,
+    paddingVertical: 12,
+    gap: S.sm,
+  },
+  dsUserId: { flex: 2, fontSize: 13, fontWeight: '600', color: C.text },
+  dsStat: { flex: 1, fontSize: 13, fontWeight: '600', color: C.primaryDim, textAlign: 'right' },
 
   // Sessions
   sessionsCard: {

@@ -119,8 +119,10 @@ export default function PedidosDetailScreen() {
   if (!orderActual) return null;
 
   const lock = orderActual.lock;
-  const esMiLock = lock?.lockedBy === user?.userId;
-  const otroTieneLock = lock && !esMiLock;
+  // Toleramos varios posibles nombres de campo hasta que el backend confirme el correcto (ver bug.md BUG-02)
+  const lockOwner = lock?.lockedBy ?? lock?.userId ?? lock?.user_id ?? lock?.user ?? orderActual?.reviewed_by;
+  const esMiLock  = !!lockOwner && lockOwner === user?.userId;
+  const otroTieneLock = !!lock && !esMiLock;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contenido}>
@@ -129,7 +131,7 @@ export default function PedidosDetailScreen() {
         <View style={styles.lockBanner}>
           <MaterialCommunityIcons name="lock" size={14} color={C.warn} />
           <Text style={styles.lockText}>
-            En revisión por <Text style={{ fontWeight: '700' }}>{lock.lockedBy}</Text> · solo lectura
+            En revisión por <Text style={{ fontWeight: '700' }}>{lockOwner ?? '—'}</Text> · solo lectura
           </Text>
         </View>
       )}

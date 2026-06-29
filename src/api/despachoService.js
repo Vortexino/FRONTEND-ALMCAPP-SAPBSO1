@@ -23,10 +23,13 @@ export async function cancelDispatch({ dispatchId }) {
   return data.data;
 }
 
+// Ahora devuelve array (un usuario puede tener múltiples despachos activos en paralelo).
+// Retornamos el más reciente (data[0]) para mantener compatibilidad con el store.
 export async function getActiveDispatch() {
   const { data } = await axiosClient.get('/dispatch/active/me');
-  if (!data.success) return null;
-  return { ...data.data, dispatchId: data.data.id };
+  if (!data.success || !data.data?.length) return null;
+  const dispatch = data.data[0];
+  return { ...dispatch, dispatchId: dispatch.id };
 }
 
 export async function getDispatch(dispatchId) {

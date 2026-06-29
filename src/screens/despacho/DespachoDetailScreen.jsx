@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -7,6 +7,7 @@ import Toast from 'react-native-toast-message';
 import { useDespacho } from '../../hooks/useDespacho';
 import ProductoItem from '../../components/despacho/ProductoItem';
 import BarcodeScannerView from '../../components/despacho/BarcodeScannerView';
+import HidScannerInput from '../../components/shared/HidScannerInput';
 import { ROUTES } from '../../constants/routes';
 import { C, S, shadow } from '../../constants/theme';
 
@@ -21,6 +22,14 @@ export default function DespachoDetailScreen() {
   const { docNum } = route.params ?? {};
   const { dispatchActual, itemActual, estadoUI, user, iniciarDespacho, escanearArticulo, marcarFaltante, cancelarDespacho, resetDispatch } = useDespacho();
   const [scannerVisible, setScannerVisible] = useState(false);
+  const hidRef = useRef(null);
+
+  // Vuelve a enfocar el scanner HID cuando se cierra el modal de cámara
+  useEffect(() => {
+    if (!scannerVisible) {
+      setTimeout(() => hidRef.current?.focus(), 150);
+    }
+  }, [scannerVisible]);
 
   const soyResponsable = dispatchActual?.userId === user?.userId;
 
@@ -167,6 +176,9 @@ export default function DespachoDetailScreen() {
           )}
         </View>
       </View>
+
+      {/* Scanner HID: siempre activo en pantalla para scanners físicos Bluetooth/USB */}
+      <HidScannerInput inputRef={hidRef} onScanned={onCodigoEscaneado} />
 
       <BarcodeScannerView
         visible={scannerVisible}

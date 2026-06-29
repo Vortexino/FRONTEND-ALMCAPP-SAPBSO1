@@ -64,6 +64,19 @@ export function useDespacho() {
         setEstadoUI({ loading: false, error: null });
         return { ok: true };
       } catch (error) {
+        // 409: ya existe un despacho activo → recuperarlo y cargarlo en el store
+        if (error?.response?.status === 409) {
+          try {
+            const active = await despachoService.getActiveDispatch();
+            if (active) {
+              iniciarDispatchStore(active);
+              setEstadoUI({ loading: false, error: null });
+              return { ok: true };
+            }
+          } catch {
+            // Si la recuperación falla, caer al error original
+          }
+        }
         const msg = error?.response?.data?.error || MENSAJE_ERROR_CONEXION;
         setEstadoUI({ loading: false, error: msg });
         return { ok: false, error: msg };
