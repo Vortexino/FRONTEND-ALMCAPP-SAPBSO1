@@ -18,4 +18,7 @@ export const ROUTES = {
 
   // Catálogo / códigos de barra
   ITEM_BARCODE: 'ItemBarcode',
+
+  // Admin
+  REGISTER: 'Register',
 };

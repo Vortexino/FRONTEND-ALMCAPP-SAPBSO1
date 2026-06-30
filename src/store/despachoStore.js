@@ -49,7 +49,7 @@ export const useDespachoStore = create((set, get) => ({
         ? {
             ...item,
             ...scanned,
-            // Estado derivado de lo que dice el backend sobre este item
+            barCode: scanned.barCode ?? item.barCode, // preservar si el scan response no lo trae
             estado: scanned.completed ? ESTADOS_ARTICULO.COMPLETADO : ESTADOS_ARTICULO.PENDIENTE,
           }
         : item

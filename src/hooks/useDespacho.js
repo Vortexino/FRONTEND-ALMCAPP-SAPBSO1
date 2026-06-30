@@ -92,7 +92,18 @@ export function useDespacho() {
     async (codigoEscaneado) => {
       if (!dispatchActual) return { ok: false, motivo: 'sin_sesion' };
 
-      const item = dispatchActual.invoice.items.find((i) => i.itemCode === codigoEscaneado);
+      // Normalizar: quitar chars no imprimibles que algunos HID agregan
+      const codigoLimpio = codigoEscaneado.replace(/[^\x20-\x7E]/g, '').trim();
+      // Algunos HID mandan EAN-13 (0 + UPC-A). Si empieza con 0 y tiene 13 dígitos,
+      // también buscar sin el 0 (UPC-A) para cubrir la variante que guarda el backend.
+      const variantes = [codigoLimpio];
+      if (codigoLimpio.length === 13 && codigoLimpio.startsWith('0')) {
+        variantes.push(codigoLimpio.slice(1));
+      }
+
+      const item = dispatchActual.invoice.items.find(
+        (i) => variantes.includes(i.itemCode) || (i.barCode && variantes.includes(i.barCode))
+      );
 
       if (!item) {
         vibrarErrorEscaneo();
@@ -112,7 +123,7 @@ export function useDespacho() {
       try {
         const scanResult = await despachoService.scanItem({
           dispatchId: dispatchActual.dispatchId,
-          itemCode: codigoEscaneado,
+          itemCode: codigoLimpio,
         });
         // Usar la respuesta real del backend (ScanResult) para actualizar el store.
         // Esto maneja correctamente items con quantity > 1 (no los marca completos prematuramente).

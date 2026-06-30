@@ -53,6 +53,41 @@ npx expo start --tunnel   # si NO está en la misma red (requiere @expo/ngrok, y
 Probar con la app **Expo Go** (no build nativo, no dev client). Cualquier librería
 nueva que se proponga agregar debe ser compatible con Expo Go o se descarta.
 
+### `--tunnel` está roto (no es bug del proyecto, es incompatibilidad de ngrok)
+
+`npx expo start --tunnel` actualmente **no funciona** en esta máquina y no es algo
+arreglable editando código del repo. Causa raíz, confirmada:
+
+- `@expo/ngrok` (devDependency) trae embebido un binario ngrok **v2**
+  (`@expo/ngrok-bin@2.3.42`, no existe versión v3 publicada). ngrok deprecó el
+  protocolo de agente v2 en su nube — el binario v2 se cae con `failed to start
+  tunnel / remote gone away`.
+- Sustituir el binario por un ngrok v3 real (instalado en el sistema) tampoco
+  sirve: `@expo/ngrok` controla el túnel llamando a la API local del agente
+  (`POST /api/tunnels`) para crear túneles dinámicamente — esa API **fue
+  eliminada en ngrok v3** (`invalid tunnel configuration`, campos
+  `authtoken`/`configPath`/`port` no reconocidos por el schema v3).
+- Conclusión: `@expo/ngrok` es incompatible con el ngrok actual sin importar
+  qué binario se use. No hay fix de código posible; haría falta que Expo
+  publique una versión que use otro mecanismo de túnel.
+
+Workaround manual probado (`ngrok http 8081` con el ngrok v3 del sistema)
+también falla en esta cuenta: el plan free de ngrok solo permite **un dominio
+estático simultáneo**, y ya está ocupado por el túnel persistente del
+**backend** (`nonabstractly-interpetiolar-millard.ngrok-free.dev`). No se puede
+correr un túnel de frontend en paralelo con la cuenta actual.
+
+Nota de entorno: el `ngrok.exe` del sistema está instalado vía Microsoft Store
+(MSIX) — al ejecutarlo por el alias del PATH, la virtualización de archivos de
+MSIX lo hace leer una copia *sandboxeada* de `ngrok.yml` (con un authtoken
+distinto/inválido), no el archivo real en
+`%LOCALAPPDATA%\ngrok\ngrok.yml`. Para inspeccionar o usar el ngrok real hay que
+copiar el binario fuera de `WindowsApps` y ejecutarlo desde ahí.
+
+**Alternativas mientras no se resuelva:** mismo WiFi que la máquina de
+desarrollo (`npx expo start` sin `--tunnel`), o una cuenta/dominio ngrok
+separado exclusivo para frontend.
+
 Para subir/bajar de versión de SDK: editar `expo` en `package.json`, borrar
 `node_modules` + `package-lock.json`, `npm install`, luego `npx expo install --fix`
 para realinear el resto de paquetes nativos. Verificar con `npx expo-doctor`.

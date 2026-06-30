@@ -120,9 +120,13 @@ export default function PedidosDetailScreen() {
 
   const lock = orderActual.lock;
   // Toleramos varios posibles nombres de campo hasta que el backend confirme el correcto (ver bug.md BUG-02)
-  const lockOwner = lock?.lockedBy ?? lock?.userId ?? lock?.user_id ?? lock?.user ?? orderActual?.reviewed_by;
+  const lockOwner = lock?.lockedBy ?? lock?.userId ?? lock?.user_id ?? lock?.user
+    ?? lock?.reviewedBy ?? lock?.reviewed_by ?? lock?.createdBy ?? lock?.created_by
+    ?? orderActual?.reviewed_by ?? orderActual?.reviewedBy;
   const esMiLock  = !!lockOwner && lockOwner === user?.userId;
-  const otroTieneLock = !!lock && !esMiLock;
+  // Solo bloquear si conocemos al dueño del lock Y no soy yo.
+  // Si lockOwner es desconocido (campo no mapeado aún), no bloquear al usuario actual.
+  const otroTieneLock = !!lockOwner && !esMiLock;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contenido}>

@@ -26,10 +26,19 @@ export const usePedidosStore = create((set) => ({
   setOrderActual: (orderActual) => set({ orderActual }),
 
   updateOrderActual: (order) =>
-    set((state) => ({
-      orderActual: order,
-      orders: state.orders.map((o) => (o.id === order.id ? order : o)),
-    })),
+    set((state) => {
+      // Preservar barCode del estado anterior si el response no lo trae
+      const prevItems = state.orderActual?.items ?? [];
+      const items = order.items?.map((item) => {
+        const prev = prevItems.find((p) => p.lineNum === item.lineNum);
+        return { ...item, barCode: item.barCode ?? prev?.barCode };
+      }) ?? order.items;
+      const merged = { ...order, items };
+      return {
+        orderActual: merged,
+        orders: state.orders.map((o) => (o.id === merged.id ? merged : o)),
+      };
+    }),
 
   resetOrderActual: () => set({ orderActual: null }),
 }));

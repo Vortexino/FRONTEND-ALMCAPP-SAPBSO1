@@ -66,13 +66,28 @@ export default function ItemAvailabilityRow({ item, onUpdate, disabled }) {
       <View style={styles.body}>
         {/* Encabezado */}
         <View style={styles.topRow}>
-          <Text style={styles.codigo}>{item.itemCode}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.codigo}>{item.itemCode}</Text>
+            {item.barCode ? (
+              <Text style={styles.barCode}>{item.barCode}</Text>
+            ) : null}
+          </View>
           <Text style={styles.qty}>×{item.quantity}</Text>
         </View>
 
         {item.itemDescription ? (
           <Text style={styles.descripcion} numberOfLines={1}>{item.itemDescription}</Text>
         ) : null}
+
+        {/* Progreso de escaneo por unidad (scannedQty < remainingQty) */}
+        {item.scannedQty > 0 && item.availability === ITEM_AVAILABILITY.PENDING && (
+          <View style={styles.scanProgressRow}>
+            <MaterialCommunityIcons name="barcode-scan" size={12} color={C.primary} />
+            <Text style={styles.scanProgressText}>
+              {item.scannedQty} / {item.remainingQty} escaneados
+            </Text>
+          </View>
+        )}
 
         {(item.sapStock != null || item.netAvailable != null) && (
           <View style={styles.stockRow}>
@@ -140,8 +155,12 @@ const styles = StyleSheet.create({
 
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   codigo: { fontSize: 14, fontWeight: '700', color: C.text, letterSpacing: -0.2 },
+  barCode: { fontSize: 11, color: C.textMuted, letterSpacing: 0.5, fontVariant: ['tabular-nums'] },
   qty: { fontSize: 13, fontWeight: '600', color: C.primary },
   descripcion: { fontSize: 13, color: C.textSec },
+
+  scanProgressRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  scanProgressText: { fontSize: 11, fontWeight: '600', color: C.primary },
 
   stockRow: { flexDirection: 'row', gap: S.md },
   stockLabel: { fontSize: 11, color: C.textMuted },

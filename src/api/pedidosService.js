@@ -22,9 +22,9 @@ export async function reviewOrder(orderId) {
 }
 
 // Picking físico: escanea el código de barras de un artículo durante la revisión.
-// El backend consulta stock SAP en tiempo real y actualiza availability del item.
-export async function scanOrderItem(orderId, itemCode) {
-  const { data } = await axiosClient.post(`/orders/${orderId}/items/scan`, { itemCode });
+// El backend resuelve si es barCode o itemCode y actualiza availability del item.
+export async function scanOrderItem(orderId, scannedCode) {
+  const { data } = await axiosClient.post(`/orders/${orderId}/items/scan`, { scannedCode });
   return data; // Order completo actualizado
 }
 

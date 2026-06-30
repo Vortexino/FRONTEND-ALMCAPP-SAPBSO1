@@ -36,26 +36,20 @@ export default function LoginScreen() {
   const { login } = useAuth();
   const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
-  const [warehouseCode, setWarehouseCode] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const passwordRef = useRef(null);
-  const warehouseRef = useRef(null);
 
   const onLogin = async () => {
-    if (!userId.trim() || !password.trim() || !warehouseCode.trim()) {
+    if (!userId.trim() || !password.trim()) {
       setError('Completa todos los campos.');
       return;
     }
     setLoading(true);
     setError(null);
-    const res = await login({
-      userId: userId.trim(),
-      password: password.trim(),
-      warehouseCode: warehouseCode.trim(),
-    });
+    const res = await login({ userId: userId.trim(), password: password.trim() });
     setLoading(false);
     if (!res.ok) setError(res.error);
   };
@@ -92,8 +86,8 @@ export default function LoginScreen() {
             value={password}
             onChangeText={setPassword}
             secureTextEntry={!passwordVisible}
-            returnKeyType="next"
-            onSubmitEditing={() => warehouseRef.current?.focus()}
+            returnKeyType="done"
+            onSubmitEditing={onLogin}
             right={
               <TextInput.Icon
                 icon={passwordVisible ? 'eye-off' : 'eye'}
@@ -101,17 +95,6 @@ export default function LoginScreen() {
                 onPress={() => setPasswordVisible((v) => !v)}
               />
             }
-          />
-          <FormField
-            ref={warehouseRef}
-            label="CÓDIGO DE ALMACÉN"
-            value={warehouseCode}
-            onChangeText={setWarehouseCode}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            returnKeyType="done"
-            onSubmitEditing={onLogin}
-            placeholder="ej: 01"
           />
 
           {error && <Text style={styles.errorTexto}>{error}</Text>}

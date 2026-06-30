@@ -20,7 +20,7 @@ export default function DespachoDetailScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const { docNum } = route.params ?? {};
-  const { dispatchActual, itemActual, estadoUI, user, iniciarDespacho, escanearArticulo, marcarFaltante, cancelarDespacho, resetDispatch } = useDespacho();
+  const { dispatchActual, itemActual, estadoUI, user, todosRevisados, iniciarDespacho, escanearArticulo, marcarFaltante, cancelarDespacho, resetDispatch } = useDespacho();
   const [scannerVisible, setScannerVisible] = useState(false);
   const hidRef = useRef(null);
 
@@ -47,7 +47,7 @@ export default function DespachoDetailScreen() {
             if (res.ok) {
               Toast.show({ type: 'info', text1: 'Despacho cancelado.' });
               resetDispatch();
-              navigation.navigate(ROUTES.DESPACHO_LIST);
+              navigation.pop();
             } else {
               Toast.show({ type: 'error', text1: res.error });
             }
@@ -150,14 +150,25 @@ export default function DespachoDetailScreen() {
 
       {/* Footer */}
       <View style={styles.footer}>
-        <Pressable
-          onPress={() => setScannerVisible(true)}
-          style={({ pressed }) => [styles.btnScan, pressed && { opacity: 0.85 }]}
-        >
-          <MaterialCommunityIcons name="barcode-scan" size={18} color="#fff" />
-          <Text style={styles.btnScanLabel}>Escanear artículo</Text>
-        </Pressable>
+        {todosRevisados ? (
+          <Pressable
+            onPress={() => navigation.navigate(ROUTES.DESPACHO_CONFIRM)}
+            style={({ pressed }) => [styles.btnScan, styles.btnScanListo, pressed && { opacity: 0.85 }]}
+          >
+            <MaterialCommunityIcons name="check-circle-outline" size={18} color="#fff" />
+            <Text style={styles.btnScanLabel}>Todos revisados — Ir a confirmar</Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            onPress={() => setScannerVisible(true)}
+            style={({ pressed }) => [styles.btnScan, pressed && { opacity: 0.85 }]}
+          >
+            <MaterialCommunityIcons name="barcode-scan" size={18} color="#fff" />
+            <Text style={styles.btnScanLabel}>Escanear artículo</Text>
+          </Pressable>
+        )}
         <View style={styles.footerRow}>
+          {!todosRevisados && (
           <Pressable
             onPress={() => navigation.navigate(ROUTES.DESPACHO_CONFIRM)}
             style={({ pressed }) => [styles.btnConfirm, pressed && { opacity: 0.75 }]}
@@ -165,6 +176,7 @@ export default function DespachoDetailScreen() {
             <Text style={styles.btnConfirmLabel}>Ir a confirmación</Text>
             <MaterialCommunityIcons name="chevron-right" size={16} color={C.primary} />
           </Pressable>
+          )}
           {soyResponsable && (
             <Pressable
               onPress={onCancelar}
@@ -243,6 +255,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   btnScanLabel: { color: '#fff', fontWeight: '700', fontSize: 15, letterSpacing: 0.2 },
+  btnScanListo: { backgroundColor: C.success },
 
   footerRow: {
     flexDirection: 'row',

@@ -6,14 +6,13 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { C, S } from '../../constants/theme';
 import HidScannerInput from '../shared/HidScannerInput';
 
+// rss14/rssexpanded no están en el enum BarcodeType de expo-camera v17 (Android MLKit)
 const TIPOS_CODIGO = [
   'qr',
   'code128', 'code39', 'code93',
   'ean13', 'ean8',
   'upc_a', 'upc_e',
   'itf14',
-  'rss14',       // GS1 DataBar Omnidirectional (RSS-4/RSS-14) — artículos pequeños
-  'rssexpanded', // GS1 DataBar Expanded — con datos adicionales
 ];
 
 export default function BarcodeScannerView({ visible, onClose, onScanned, title = 'Escanear código' }) {

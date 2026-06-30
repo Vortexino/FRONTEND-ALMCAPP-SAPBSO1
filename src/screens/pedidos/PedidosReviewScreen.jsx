@@ -114,11 +114,15 @@ export default function PedidosReviewScreen() {
 
   // Solo el dueño del lock puede confirmar o rechazar (backend valida con 409).
   const lock = orderActual?.lock;
-  const lockOwner = lock?.lockedBy ?? lock?.userId ?? lock?.user_id ?? lock?.user ?? orderActual?.reviewed_by;
+  const lockOwner = lock?.lockedBy ?? lock?.userId ?? lock?.user_id ?? lock?.user
+    ?? lock?.reviewedBy ?? lock?.reviewed_by ?? lock?.createdBy ?? lock?.created_by
+    ?? orderActual?.reviewed_by ?? orderActual?.reviewedBy;
   const esMiLock = !!lockOwner && lockOwner === user?.userId;
+  // Solo bloquear si conocemos al dueño del lock Y no soy yo.
+  const otroTieneLock = !!lockOwner && !esMiLock;
 
   const puedeConfirmar =
-    esMiLock &&
+    !otroTieneLock &&
     !hayPendientes &&
     orderActual.status !== ORDER_STATUS.CONFIRMED &&
     orderActual.status !== ORDER_STATUS.REJECTED;
@@ -214,10 +218,10 @@ export default function PedidosReviewScreen() {
 
         <Pressable
           onPress={onRechazar}
-          disabled={actionLoading || !esMiLock}
+          disabled={actionLoading || otroTieneLock}
           style={({ pressed }) => [
             styles.btnRechazar,
-            (actionLoading || !esMiLock) && { opacity: 0.45 },
+            (actionLoading || otroTieneLock) && { opacity: 0.45 },
             pressed && { opacity: 0.75 },
           ]}
         >

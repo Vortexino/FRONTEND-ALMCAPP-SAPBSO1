@@ -42,7 +42,7 @@ export default function DespachoConfirmScreen() {
     if (resultado.ok) {
       Toast.show({ type: 'success', text1: 'Despacho finalizado correctamente' });
       resetDispatch();
-      navigation.navigate(ROUTES.DESPACHO_LIST);
+      navigation.pop(2);
     }
   }, [confirmarDespacho, resetDispatch, navigation]);
 

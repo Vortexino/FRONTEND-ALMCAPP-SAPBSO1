@@ -12,15 +12,31 @@ export function useAuth() {
   const setLoading = useAuthStore((s) => s.setLoading);
 
   const login = useCallback(
-    async ({ userId, password, warehouseCode }) => {
+    async ({ userId, password }) => {
       try {
-        const res = await authService.login({ userId, password, warehouseCode });
+        const res = await authService.login({ userId, password });
         await SecureStore.setItemAsync('auth_token', res.token);
         await SecureStore.setItemAsync('auth_user', JSON.stringify(res.user));
         setAuth(res.user, res.token);
         return { ok: true };
       } catch (error) {
         const mensaje = error?.response?.data?.error || 'Credenciales inválidas o sin conexión.';
+        return { ok: false, error: mensaje };
+      }
+    },
+    [setAuth]
+  );
+
+  const switchWarehouse = useCallback(
+    async ({ warehouseCode }) => {
+      try {
+        const res = await authService.switchWarehouse({ warehouseCode });
+        await SecureStore.setItemAsync('auth_token', res.token);
+        await SecureStore.setItemAsync('auth_user', JSON.stringify(res.user));
+        setAuth(res.user, res.token);
+        return { ok: true };
+      } catch (error) {
+        const mensaje = error?.response?.data?.error || 'No se pudo cambiar el almacén.';
         return { ok: false, error: mensaje };
       }
     },
@@ -54,5 +70,5 @@ export function useAuth() {
     }
   }, [setAuth, clearAuth, setLoading]);
 
-  return { user, token, isLoading, login, logout, checkAuth };
+  return { user, token, isLoading, login, logout, checkAuth, switchWarehouse };
 }

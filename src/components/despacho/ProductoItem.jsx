@@ -10,10 +10,12 @@ export default function ProductoItem({ item, sugerido, onMarcarFaltante }) {
   const puedeMarcarFaltante = item.estado === ESTADOS_ARTICULO.PENDIENTE;
   const completado = item.estado === ESTADOS_ARTICULO.COMPLETADO;
 
+  const faltante = item.estado === ESTADOS_ARTICULO.FALTANTE;
+
   return (
-    <View style={[styles.card, shadow.sm, sugerido && styles.cardSugerido]}>
+    <View style={[styles.card, shadow.sm, sugerido && styles.cardSugerido, faltante && styles.cardFaltante]}>
       {/* Acento lateral — azul si es el artículo sugerido siguiente */}
-      <View style={[styles.acento, { backgroundColor: sugerido ? C.primary : C.border }]} />
+      <View style={[styles.acento, { backgroundColor: sugerido ? C.primary : faltante ? C.warn : C.border }]} />
 
       <View style={styles.body}>
         <View style={styles.topRow}>
@@ -28,6 +30,9 @@ export default function ProductoItem({ item, sugerido, onMarcarFaltante }) {
                 {item.itemCode}
               </Text>
             </View>
+            {item.barCode && (
+              <Text style={styles.barCode}>{item.barCode}</Text>
+            )}
             {(item.description || item.itemDescription) && (
               <Text style={styles.descripcion} numberOfLines={1}>
                 {item.description ?? item.itemDescription}
@@ -79,6 +84,10 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: C.primary,
   },
+  cardFaltante: {
+    borderWidth: 1.5,
+    borderColor: C.warn,
+  },
   acento: { width: 4 },
   body: { flex: 1, padding: S.md, gap: S.sm },
 
@@ -96,6 +105,7 @@ const styles = StyleSheet.create({
   nextLabel: { fontSize: 9, fontWeight: '800', color: '#fff', letterSpacing: 0.6 },
 
   contadorWrap: { flexDirection: 'row', alignItems: 'baseline', gap: 2 },
+  barCode: { fontSize: 11, color: C.textMuted, letterSpacing: 0.5, fontVariant: ['tabular-nums'] },
   descripcion: { fontSize: 12, color: C.textSec },
   ubicacionRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   ubicacion: { fontSize: 11, color: C.primaryDim, fontWeight: '600' },

@@ -17,6 +17,7 @@ import DespachoListScreen from '../screens/despacho/DespachoListScreen';
 import DespachoDetailScreen from '../screens/despacho/DespachoDetailScreen';
 import DespachoConfirmScreen from '../screens/despacho/DespachoConfirmScreen';
 import ItemBarcodeScreen from '../screens/items/ItemBarcodeScreen';
+import RegisterScreen from '../screens/auth/RegisterScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -108,6 +109,13 @@ export default function AppNavigator() {
               name={ROUTES.ITEM_BARCODE}
               component={ItemBarcodeScreen}
               options={{ title: 'Códigos de barra' }}
+            />
+
+            {/* Admin */}
+            <Stack.Screen
+              name={ROUTES.REGISTER}
+              component={RegisterScreen}
+              options={{ title: 'Crear usuario' }}
             />
           </>
         )}

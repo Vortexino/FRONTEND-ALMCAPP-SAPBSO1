@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Pressable,
@@ -14,6 +14,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useDashboard } from '../../hooks/useDashboard';
 import { ROUTES } from '../../constants/routes';
 import { C, S, shadow } from '../../constants/theme';
+import WarehouseSelectorModal from '../../components/shared/WarehouseSelectorModal';
 
 // ── Tarjeta KPI ────────────────────────────────────────────────────────────────
 function KpiCard({ label, value, icon, color = C.primary, colorLight }) {
@@ -60,10 +61,21 @@ export default function HomeScreen() {
   const navigation = useNavigation();
   const { user, logout } = useAuth();
   const { summary, loading, error, fetchSummary } = useDashboard();
+  const needsWarehouse = !user?.warehouseCode;
+  const canSwitchWarehouse = user?.role === 'admin' || (user?.warehouseCodes?.length > 1);
+  const [warehouseModalVisible, setWarehouseModalVisible] = useState(needsWarehouse);
 
   useEffect(() => {
     fetchSummary();
   }, [fetchSummary]);
+
+  // Cierra el modal y recarga datos cuando cambia el almacén activo
+  useEffect(() => {
+    if (user?.warehouseCode) {
+      setWarehouseModalVisible(false);
+      fetchSummary();
+    }
+  }, [user?.warehouseCode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onRefresh = useCallback(async () => {
     await fetchSummary();
@@ -77,6 +89,10 @@ export default function HomeScreen() {
   };
 
   return (
+    <>
+      <WarehouseSelectorModal
+        visible={warehouseModalVisible || needsWarehouse}
+      />
     <ScrollView
       style={styles.scroll}
       contentContainerStyle={styles.container}
@@ -87,9 +103,21 @@ export default function HomeScreen() {
         <View style={{ flex: 1 }}>
           <Text style={styles.greeting}>{greeting()},</Text>
           <Text style={styles.userName}>{user?.name?.split(' ')[0]}</Text>
-          <Text style={styles.userMeta}>
-            {user?.role?.toUpperCase()} · ALMACÉN {user?.warehouseCode}
-          </Text>
+          {canSwitchWarehouse ? (
+            <Pressable
+              onPress={() => setWarehouseModalVisible(true)}
+              style={styles.warehouseChip}
+            >
+              <Text style={styles.userMeta}>
+                {user?.role?.toUpperCase()} · ALMACÉN {user?.warehouseCode ?? '—'}
+              </Text>
+              <MaterialCommunityIcons name="swap-horizontal" size={13} color={C.primary} />
+            </Pressable>
+          ) : (
+            <Text style={styles.userMeta}>
+              {user?.role?.toUpperCase()} · ALMACÉN {user?.warehouseCode}
+            </Text>
+          )}
         </View>
         <Pressable onPress={logout} style={({ pressed }) => [styles.logoutBtn, pressed && { opacity: 0.6 }]}>
           <MaterialCommunityIcons name="logout" size={18} color={C.textSec} />
@@ -191,7 +219,22 @@ export default function HomeScreen() {
           />
         </>
       )}
+
+      {/* Solo admin: crear usuarios */}
+      {user?.role === 'admin' && (
+        <View style={{ marginTop: S.md }}>
+          <ModuleButton
+            label="Crear usuario"
+            subtitle="Registrar operador o supervisor"
+            icon="account-plus-outline"
+            color={C.warn}
+            colorLight={C.warnLight}
+            onPress={() => navigation.navigate(ROUTES.REGISTER)}
+          />
+        </View>
+      )}
     </ScrollView>
+    </>
   );
 }
 
@@ -215,6 +258,13 @@ const styles = StyleSheet.create({
     color: C.textMuted,
     marginTop: 4,
     textTransform: 'uppercase',
+  },
+  warehouseChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+    alignSelf: 'flex-start',
   },
   logoutBtn: {
     width: 38,
