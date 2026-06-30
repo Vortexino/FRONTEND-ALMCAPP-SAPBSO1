@@ -157,6 +157,17 @@ export default function HomeScreen() {
         />
       </View>
 
+      <View style={[styles.modulosRow, { marginTop: S.md }]}>
+        <ModuleButton
+          label="Códigos de barra"
+          subtitle="Identificar y asociar"
+          icon="barcode-scan"
+          color={C.info}
+          colorLight={C.infoLight}
+          onPress={() => navigation.navigate(ROUTES.ITEM_BARCODE)}
+        />
+      </View>
+
       {/* Admin/Manager: usuarios activos + botón de dashboard completo */}
       {(user?.role === 'admin' || user?.role === 'manager') && (
         <>

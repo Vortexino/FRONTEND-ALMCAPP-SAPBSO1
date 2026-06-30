@@ -15,4 +15,7 @@ export const ROUTES = {
   DESPACHO_LIST: 'DespachoList',
   DESPACHO_DETAIL: 'DespachoDetail',
   DESPACHO_CONFIRM: 'DespachoConfirm',
+
+  // Catálogo / códigos de barra
+  ITEM_BARCODE: 'ItemBarcode',
 };
