@@ -170,7 +170,7 @@ export default function PedidosReviewScreen() {
       <FlatList
         data={orderActual.items}
         keyExtractor={(item) => String(item.lineNum)}
-        extraData={actionLoading}
+        extraData={orderActual}
         renderItem={({ item }) => (
           <ItemAvailabilityRow
             item={item}

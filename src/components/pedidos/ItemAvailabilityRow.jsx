@@ -88,6 +88,10 @@ export default function ItemAvailabilityRow({ item, onUpdate, disabled, sugerido
         sugerido && styles.cardSugerido,
         sinStock && !sugerido && styles.cardSinStock,
       ]}>
+        {/* Wrapper interior con overflow:hidden para clipear el acento a los bordes redondeados.
+            Separado del card exterior para evitar bug de Android donde overflow:hidden + elevation
+            + cambios dinámicos de hijos deja la tarjeta en blanco. */}
+        <View style={styles.cardClip}>
         <View style={[styles.acento, { backgroundColor: acentoColor }]} />
 
         <View style={styles.body}>
@@ -224,6 +228,7 @@ export default function ItemAvailabilityRow({ item, onUpdate, disabled, sugerido
             </View>
           ) : null}
         </View>
+        </View>{/* cierre cardClip */}
       </View>
 
       <AssignBarcodeModal
@@ -239,12 +244,15 @@ export default function ItemAvailabilityRow({ item, onUpdate, disabled, sugerido
 const styles = StyleSheet.create({
   // Tarjeta — idéntica a ProductoItem de Despacho
   card: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
     backgroundColor: C.surface,
     borderRadius: 14,
     marginHorizontal: S.base,
     marginVertical: 5,
+  },
+  cardClip: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    borderRadius: 14,
     overflow: 'hidden',
   },
   cardSugerido: { borderWidth: 1.5, borderColor: C.primary },

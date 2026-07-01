@@ -27,13 +27,16 @@ export const usePedidosStore = create((set) => ({
 
   updateOrderActual: (order) =>
     set((state) => {
-      // Preservar barCode del estado anterior si el response no lo trae
       const prevItems = state.orderActual?.items ?? [];
-      const items = order.items?.map((item) => {
-        const prev = prevItems.find((p) => p.lineNum === item.lineNum);
-        return { ...item, barCode: item.barCode ?? prev?.barCode };
-      }) ?? order.items;
-      const merged = { ...order, items };
+      // Si el backend no devuelve items (respuesta parcial o formato inesperado),
+      // conservar los items previos para que el FlatList no quede vacío.
+      const items = order.items
+        ? order.items.map((item) => {
+            const prev = prevItems.find((p) => p.lineNum === item.lineNum);
+            return { ...item, barCode: item.barCode ?? prev?.barCode };
+          })
+        : prevItems;
+      const merged = { ...state.orderActual, ...order, items };
       return {
         orderActual: merged,
         orders: state.orders.map((o) => (o.id === merged.id ? merged : o)),
