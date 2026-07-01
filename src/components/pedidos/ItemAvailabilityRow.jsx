@@ -1,62 +1,41 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
-import { Text, TextInput } from 'react-native-paper';
+import { ActivityIndicator, Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ITEM_AVAILABILITY } from '../../store/pedidosStore';
 import AssignBarcodeModal from '../shared/AssignBarcodeModal';
 import { C, S, shadow } from '../../constants/theme';
 
 const AVAIL_CFG = {
-  [ITEM_AVAILABILITY.PENDING]:        { label: 'Pendiente',  icon: 'clock-outline',   color: C.textSec, bg: C.bg },
-  [ITEM_AVAILABILITY.AVAILABLE]:      { label: 'Disponible', icon: 'check-circle',    color: C.success, bg: C.successLight },
-  [ITEM_AVAILABILITY.NEEDS_TRANSFER]: { label: 'Traslado',   icon: 'swap-horizontal', color: C.warn,    bg: C.warnLight },
-  [ITEM_AVAILABILITY.UNAVAILABLE]:    { label: 'Sin stock',  icon: 'close-circle',    color: C.danger,  bg: C.dangerLight },
+  [ITEM_AVAILABILITY.PENDING]:     { label: 'Pendiente',  icon: 'clock-outline',          color: C.textSec, bg: C.bg },
+  [ITEM_AVAILABILITY.AVAILABLE]:   { label: 'Disponible', icon: 'check-circle',            color: C.success, bg: C.successLight },
+  [ITEM_AVAILABILITY.UNAVAILABLE]: { label: 'Faltante',   icon: 'package-variant-remove',  color: C.danger,  bg: C.dangerLight },
+  [ITEM_AVAILABILITY.NEEDS_TRANSFER]: { label: 'Traslado', icon: 'swap-horizontal',        color: C.warn,    bg: C.warnLight },
 };
 
-const OPCIONES = [
-  { value: ITEM_AVAILABILITY.AVAILABLE,      label: 'Disponible', icon: 'check',           color: C.success, bg: C.successLight },
-  { value: ITEM_AVAILABILITY.NEEDS_TRANSFER, label: 'Traslado',   icon: 'swap-horizontal', color: C.warn,    bg: C.warnLight },
-  { value: ITEM_AVAILABILITY.UNAVAILABLE,    label: 'Sin stock',  icon: 'close',           color: C.danger,  bg: C.dangerLight },
-];
-
 export default function ItemAvailabilityRow({ item, onUpdate, disabled, sugerido }) {
-  const [note, setNote] = useState(item.transferNote ?? '');
   const [assignModalVisible, setAssignModalVisible] = useState(false);
   const [tieneBarcode, setTieneBarcode] = useState(!!item.barCode);
   const [loadingVisual, setLoadingVisual] = useState(false);
 
-  // Sync note when the store updates the item
-  useEffect(() => {
-    setNote(item.transferNote ?? '');
-  }, [item.transferNote]);
-
-  // Estado visual derivado directamente del store — sin estado local "selected"
   const availability = item.availability ?? ITEM_AVAILABILITY.PENDING;
   const pendiente  = availability === ITEM_AVAILABILITY.PENDING;
   const disponible = availability === ITEM_AVAILABILITY.AVAILABLE;
-  const traslado   = availability === ITEM_AVAILABILITY.NEEDS_TRANSFER;
-  const sinStock   = availability === ITEM_AVAILABILITY.UNAVAILABLE;
+  const faltante   = availability === ITEM_AVAILABILITY.UNAVAILABLE;
+  // Siempre mostrar acciones — cada estado permite cambiar a los otros
+  const mostrarFaltante = pendiente || disponible;   // faltante aún no está → lo puede marcar
+  const mostrarVisual   = pendiente || faltante;     // no está disponible aún → puede confirmar
+  const mostrarAsignar  = pendiente || faltante;     // no escaneado aún → puede asignar código
 
   const cfg = AVAIL_CFG[availability] ?? AVAIL_CFG[ITEM_AVAILABILITY.PENDING];
 
   const acentoColor = sugerido   ? C.primary
     : disponible ? C.success
-    : traslado   ? C.warn
-    : sinStock   ? C.danger
+    : faltante   ? C.danger
     : C.border;
 
   const scanned = item.scannedQty ?? 0;
   const contadorVerde = item.quantity > 0 && scanned >= item.quantity;
-
-  const onSeleccionar = (valor) => {
-    if (disabled) return;
-    onUpdate(item.lineNum, { availability: valor, transferNote: note });
-  };
-
-  const onGuardarNota = () => {
-    if (!traslado) return;
-    onUpdate(item.lineNum, { availability: ITEM_AVAILABILITY.NEEDS_TRANSFER, transferNote: note });
-  };
 
   const onAsignarSuccess = useCallback(() => {
     setTieneBarcode(true);
@@ -81,154 +60,138 @@ export default function ItemAvailabilityRow({ item, onUpdate, disabled, sugerido
     );
   }, [item.itemCode, item.lineNum, onUpdate]);
 
+  const onPresFaltante = useCallback(() => {
+    Alert.alert(
+      'Marcar como Faltante',
+      `¿El artículo ${item.itemCode} no está disponible en el almacén?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Sí, marcar faltante',
+          style: 'destructive',
+          onPress: () => onUpdate(item.lineNum, { availability: ITEM_AVAILABILITY.UNAVAILABLE }),
+        },
+      ]
+    );
+  }, [item.itemCode, item.lineNum, onUpdate]);
+
   return (
     <>
       <View style={[
-        styles.card, shadow.sm,
+        styles.card,
+        shadow.sm,
         sugerido && styles.cardSugerido,
-        sinStock && !sugerido && styles.cardSinStock,
+        faltante && !sugerido && styles.cardFaltante,
       ]}>
-        {/* Wrapper interior con overflow:hidden para clipear el acento a los bordes redondeados.
-            Separado del card exterior para evitar bug de Android donde overflow:hidden + elevation
-            + cambios dinámicos de hijos deja la tarjeta en blanco. */}
         <View style={styles.cardClip}>
-        <View style={[styles.acento, { backgroundColor: acentoColor }]} />
+          <View style={[styles.acento, { backgroundColor: acentoColor }]} />
 
-        <View style={styles.body}>
-          {/* Fila superior: info del artículo + contador */}
-          <View style={styles.topRow}>
-            <View style={{ flex: 1, gap: 2 }}>
-              <View style={styles.codigoRow}>
-                {sugerido && (
-                  <View style={styles.nextBadge}>
-                    <Text style={styles.nextLabel}>SIGUIENTE</Text>
-                  </View>
+          <View style={styles.body}>
+            {/* Fila superior: info + contador */}
+            <View style={styles.topRow}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <View style={styles.codigoRow}>
+                  {sugerido && (
+                    <View style={styles.nextBadge}>
+                      <Text style={styles.nextLabel}>SIGUIENTE</Text>
+                    </View>
+                  )}
+                  <Text style={styles.codigo}>{item.itemCode}</Text>
+                </View>
+                {(tieneBarcode && item.barCode) ? (
+                  <Text style={styles.barCode}>{item.barCode}</Text>
+                ) : null}
+                {item.itemDescription ? (
+                  <Text style={styles.descripcion} numberOfLines={1}>{item.itemDescription}</Text>
+                ) : null}
+                <View style={[styles.badge, { backgroundColor: cfg.bg }]}>
+                  <MaterialCommunityIcons name={cfg.icon} size={11} color={cfg.color} />
+                  <Text style={[styles.badgeLabel, { color: cfg.color }]}>{cfg.label}</Text>
+                </View>
+              </View>
+
+              <View style={styles.contadorWrap}>
+                <Text style={[styles.contadorNum, contadorVerde && { color: C.success }]}>
+                  {scanned}
+                </Text>
+                <Text style={styles.contadorSep}>/</Text>
+                <Text style={styles.contadorTotal}>{item.quantity}</Text>
+              </View>
+            </View>
+
+            {/* Stock SAP */}
+            {(item.sapStock != null || item.netAvailable != null) ? (
+              <View style={styles.stockRow}>
+                {item.sapStock != null && (
+                  <Text style={styles.stockLabel}>
+                    Stock SAP: <Text style={styles.stockVal}>{item.sapStock}</Text>
+                  </Text>
                 )}
-                <Text style={styles.codigo}>{item.itemCode}</Text>
+                {item.netAvailable != null && (
+                  <Text style={styles.stockLabel}>
+                    Neto: <Text style={styles.stockVal}>{item.netAvailable}</Text>
+                  </Text>
+                )}
               </View>
-              {(tieneBarcode && item.barCode) ? (
-                <Text style={styles.barCode}>{item.barCode}</Text>
-              ) : null}
-              {item.itemDescription ? (
-                <Text style={styles.descripcion} numberOfLines={1}>{item.itemDescription}</Text>
-              ) : null}
-              {/* Badge driven directamente por item.availability del store */}
-              <View style={[styles.badge, { backgroundColor: cfg.bg }]}>
-                <MaterialCommunityIcons name={cfg.icon} size={11} color={cfg.color} />
-                <Text style={[styles.badgeLabel, { color: cfg.color }]}>{cfg.label}</Text>
-              </View>
-            </View>
+            ) : null}
 
-            <View style={styles.contadorWrap}>
-              <Text style={[styles.contadorNum, contadorVerde && { color: C.success }]}>
-                {scanned}
-              </Text>
-              <Text style={styles.contadorSep}>/</Text>
-              <Text style={styles.contadorTotal}>{item.quantity}</Text>
-            </View>
-          </View>
-
-          {/* Stock SAP — info de referencia */}
-          {(item.sapStock != null || item.netAvailable != null) ? (
-            <View style={styles.stockRow}>
-              {item.sapStock != null && (
-                <Text style={styles.stockLabel}>
-                  Stock SAP: <Text style={styles.stockVal}>{item.sapStock}</Text>
-                </Text>
-              )}
-              {item.netAvailable != null && (
-                <Text style={styles.stockLabel}>
-                  Neto: <Text style={styles.stockVal}>{item.netAvailable}</Text>
-                </Text>
-              )}
-            </View>
-          ) : null}
-
-          {/* Asignar código + Confirmación Visual — solo cuando pendiente */}
-          {pendiente ? (
+            {/* Acciones — siempre visibles para permitir correcciones en cualquier estado */}
             <View style={styles.accionesRow}>
-              <Pressable
-                onPress={() => !tieneBarcode && setAssignModalVisible(true)}
-                style={({ pressed }) => [
-                  styles.accionBtn,
-                  styles.accionBtnAsignar,
-                  tieneBarcode && styles.accionBtnDisabled,
-                  pressed && !tieneBarcode && { opacity: 0.65 },
-                ]}
-              >
-                <MaterialCommunityIcons
-                  name={tieneBarcode ? 'barcode-off' : 'barcode-scan'}
-                  size={13}
-                  color={tieneBarcode ? C.textMuted : C.primary}
-                />
-                <Text style={[styles.accionLabel, tieneBarcode && styles.accionLabelDisabled]}>
-                  {tieneBarcode ? 'Código asignado' : 'Asignar código'}
-                </Text>
-              </Pressable>
-
-              <Pressable
-                onPress={onPresConfirmarVisual}
-                disabled={loadingVisual || disabled}
-                style={({ pressed }) => [
-                  styles.accionBtn,
-                  styles.accionBtnVisual,
-                  (pressed || loadingVisual || disabled) && { opacity: 0.65 },
-                ]}
-              >
-                <MaterialCommunityIcons name="eye-check-outline" size={13} color={C.info} />
-                <Text style={styles.accionLabelVisual}>Confirmación Visual</Text>
-              </Pressable>
-            </View>
-          ) : null}
-
-          {/* Botones de disponibilidad — activo driven por item.availability del store */}
-          <View style={styles.optsRow}>
-            {OPCIONES.map((opt) => {
-              const active = availability === opt.value;
-              return (
+              {mostrarAsignar && (
                 <Pressable
-                  key={opt.value}
-                  onPress={() => onSeleccionar(opt.value)}
-                  disabled={disabled}
+                  onPress={() => !tieneBarcode && setAssignModalVisible(true)}
                   style={({ pressed }) => [
-                    styles.optBtn,
-                    active && [styles.optBtnActive, { backgroundColor: opt.bg, borderColor: opt.color }],
-                    pressed && !disabled && { opacity: 0.75 },
-                    disabled && { opacity: 0.45 },
+                    styles.accionBtn,
+                    styles.accionBtnAsignar,
+                    tieneBarcode && styles.accionBtnDisabled,
+                    pressed && !tieneBarcode && { opacity: 0.65 },
                   ]}
                 >
                   <MaterialCommunityIcons
-                    name={opt.icon}
-                    size={14}
-                    color={active ? opt.color : C.textSec}
+                    name={tieneBarcode ? 'barcode-off' : 'barcode-scan'}
+                    size={13}
+                    color={tieneBarcode ? C.textMuted : C.primary}
                   />
-                  <Text style={[styles.optLabel, active && { color: opt.color, fontWeight: '700' }]}>
-                    {opt.label}
+                  <Text style={[styles.accionLabel, tieneBarcode && styles.accionLabelDisabled]}>
+                    {tieneBarcode ? 'Código asignado' : 'Asignar código'}
                   </Text>
                 </Pressable>
-              );
-            })}
-          </View>
+              )}
 
-          {traslado ? (
-            <View style={styles.notaFila}>
-              <TextInput
-                style={styles.notaInput}
-                mode="outlined"
-                dense
-                placeholder="Nota de traslado (opcional)"
-                value={note}
-                onChangeText={setNote}
-                onEndEditing={onGuardarNota}
-                disabled={disabled}
-                outlineStyle={{ borderRadius: 8 }}
-                activeOutlineColor={C.primary}
-                outlineColor={C.border}
-              />
+              {mostrarVisual && (
+                <Pressable
+                  onPress={onPresConfirmarVisual}
+                  disabled={loadingVisual || disabled}
+                  style={({ pressed }) => [
+                    styles.accionBtn,
+                    styles.accionBtnVisual,
+                    (pressed || loadingVisual || disabled) && { opacity: 0.65 },
+                  ]}
+                >
+                  {loadingVisual
+                    ? <ActivityIndicator size={13} color={C.info} />
+                    : <MaterialCommunityIcons name="eye-check-outline" size={13} color={C.info} />}
+                  <Text style={styles.accionLabelVisual}>Visual</Text>
+                </Pressable>
+              )}
+
+              {mostrarFaltante && (
+                <Pressable
+                  onPress={onPresFaltante}
+                  disabled={disabled}
+                  style={({ pressed }) => [
+                    styles.accionBtn,
+                    styles.accionBtnFaltante,
+                    (pressed || disabled) && { opacity: 0.65 },
+                  ]}
+                >
+                  <MaterialCommunityIcons name="package-variant-remove" size={13} color={C.danger} />
+                  <Text style={styles.accionLabelFaltante}>Faltante</Text>
+                </Pressable>
+              )}
             </View>
-          ) : null}
+          </View>
         </View>
-        </View>{/* cierre cardClip */}
       </View>
 
       <AssignBarcodeModal
@@ -242,7 +205,6 @@ export default function ItemAvailabilityRow({ item, onUpdate, disabled, sugerido
 }
 
 const styles = StyleSheet.create({
-  // Tarjeta — idéntica a ProductoItem de Despacho
   card: {
     backgroundColor: C.surface,
     borderRadius: 14,
@@ -256,7 +218,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   cardSugerido: { borderWidth: 1.5, borderColor: C.primary },
-  cardSinStock: { borderWidth: 1.5, borderColor: C.danger },
+  cardFaltante: { borderWidth: 1.5, borderColor: C.danger },
   acento: { width: 4 },
   body: { flex: 1, padding: S.md, gap: S.sm },
 
@@ -294,35 +256,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: S.sm,
-    paddingVertical: 5,
+    paddingVertical: 6,
     borderRadius: 8,
     flex: 1,
     justifyContent: 'center',
   },
-  accionBtnAsignar: { backgroundColor: C.primaryLight },
-  accionBtnVisual:  { backgroundColor: C.infoLight },
+  accionBtnAsignar:  { backgroundColor: C.primaryLight },
+  accionBtnVisual:   { backgroundColor: C.infoLight },
+  accionBtnFaltante: { backgroundColor: C.dangerLight },
   accionBtnDisabled: { backgroundColor: C.bg },
-  accionLabel: { fontSize: 11, fontWeight: '600', color: C.primary },
-  accionLabelDisabled: { color: C.textMuted },
-  accionLabelVisual: { fontSize: 11, fontWeight: '600', color: C.info },
-
-  optsRow: { flexDirection: 'row', gap: S.xs },
-  optBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingVertical: 7,
-    paddingHorizontal: 4,
-    borderRadius: 8,
-    backgroundColor: C.bg,
-    borderWidth: 1,
-    borderColor: C.border,
-  },
-  optBtnActive: { borderWidth: 1.5 },
-  optLabel: { fontSize: 11, fontWeight: '600', color: C.textSec },
-
-  notaFila: { marginTop: 4 },
-  notaInput: { backgroundColor: C.surface },
+  accionLabel:         { fontSize: 11, fontWeight: '600', color: C.primary },
+  accionLabelDisabled: { fontSize: 11, fontWeight: '600', color: C.textMuted },
+  accionLabelVisual:   { fontSize: 11, fontWeight: '600', color: C.info },
+  accionLabelFaltante: { fontSize: 11, fontWeight: '600', color: C.danger },
 });

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -10,14 +10,13 @@ import ItemAvailabilityRow from '../../components/pedidos/ItemAvailabilityRow';
 import BarcodeScannerView from '../../components/despacho/BarcodeScannerView';
 import HidScannerInput from '../../components/shared/HidScannerInput';
 import { ITEM_AVAILABILITY, ORDER_STATUS } from '../../store/pedidosStore';
-import { ROUTES } from '../../constants/routes';
 import { C, S } from '../../constants/theme';
 
 export default function PedidosReviewScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const { orderId } = route.params ?? {};
-  const { orderActual, estadoUI, user, fetchOrder, escanearItem, actualizarItem, confirmarPedido, rechazarPedido } =
+  const { orderActual, estadoUI, user, fetchOrder, escanearItem, actualizarItem, confirmarPedido } =
     usePedidos();
   const [actionLoading, setActionLoading] = useState(false);
   const [scannerVisible, setScannerVisible] = useState(false);
@@ -63,42 +62,17 @@ export default function PedidosReviewScreen() {
     [orderId, escanearItem]
   );
 
-  const onConfirmar = useCallback(async () => {
+  const onFinalizar = useCallback(async () => {
     setActionLoading(true);
     const res = await confirmarPedido(orderId);
     setActionLoading(false);
     if (res.ok) {
-      Toast.show({ type: 'success', text1: 'Orden confirmada correctamente.' });
+      Toast.show({ type: 'success', text1: 'Orden finalizada correctamente.' });
       navigation.pop(2);
     } else {
       Toast.show({ type: 'error', text1: res.error });
     }
   }, [orderId, confirmarPedido, navigation]);
-
-  const onRechazar = useCallback(() => {
-    Alert.alert(
-      'Rechazar orden',
-      '¿Estás seguro de que querés rechazar esta orden? No se puede deshacer.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Rechazar',
-          style: 'destructive',
-          onPress: async () => {
-            setActionLoading(true);
-            const res = await rechazarPedido(orderId);
-            setActionLoading(false);
-            if (res.ok) {
-              Toast.show({ type: 'info', text1: 'Orden rechazada.' });
-              navigation.pop(2);
-            } else {
-              Toast.show({ type: 'error', text1: res.error });
-            }
-          },
-        },
-      ]
-    );
-  }, [orderId, rechazarPedido, navigation]);
 
   if (!orderActual && estadoUI.loading) {
     return (
@@ -117,13 +91,10 @@ export default function PedidosReviewScreen() {
   const esMiLock = !!lockOwner && lockOwner === user?.userId;
   const otroTieneLock = !!lockOwner && !esMiLock;
 
-  const hayDisponibles = orderActual.items?.some(
-    (i) => i.availability === ITEM_AVAILABILITY.AVAILABLE
-  );
-  const puedeConfirmar =
+  // Puede finalizar cuando no quedan pendientes — faltantes cuentan como revisados
+  const puedeFinalizar =
     !otroTieneLock &&
     !hayPendientes &&
-    hayDisponibles &&
     orderActual.status !== ORDER_STATUS.CONFIRMED &&
     orderActual.status !== ORDER_STATUS.REJECTED;
 
@@ -134,7 +105,6 @@ export default function PedidosReviewScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header — mismo formato que DespachoDetailScreen */}
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <View style={{ flex: 1 }}>
@@ -148,13 +118,13 @@ export default function PedidosReviewScreen() {
           </View>
         </View>
         <View style={styles.barraWrap}>
-          <View style={[styles.barraFill, { width: `${Math.round(pct * 100)}%` }]} />
+          <View style={[styles.barraFill, { width: `${Math.round(pct * 100)}%`, backgroundColor: pct === 1 ? C.success : C.primary }]} />
         </View>
         {hayPendientes && (
           <View style={styles.avisoPendiente}>
             <MaterialCommunityIcons name="clock-outline" size={13} color={C.warn} />
             <Text style={styles.avisoTexto}>
-              {total - revisados} artículo(s) sin clasificar · escaneá o clasificá manualmente
+              {total - revisados} artículo(s) pendiente(s) · escaneá o marcá como Faltante
             </Text>
           </View>
         )}
@@ -182,7 +152,6 @@ export default function PedidosReviewScreen() {
         contentContainerStyle={styles.lista}
       />
 
-      {/* Footer — mismo layout que DespachoDetailScreen */}
       <View style={styles.footer}>
         <Pressable
           onPress={() => setScannerVisible(true)}
@@ -203,12 +172,12 @@ export default function PedidosReviewScreen() {
         </Pressable>
 
         <Pressable
-          onPress={onConfirmar}
-          disabled={!puedeConfirmar || actionLoading}
+          onPress={onFinalizar}
+          disabled={!puedeFinalizar || actionLoading}
           style={({ pressed }) => [
-            styles.btnConfirmar,
-            (!puedeConfirmar || actionLoading) && { opacity: 0.45 },
-            pressed && puedeConfirmar && { opacity: 0.8 },
+            styles.btnFinalizar,
+            (!puedeFinalizar || actionLoading) && { opacity: 0.45 },
+            pressed && puedeFinalizar && { opacity: 0.8 },
           ]}
         >
           {actionLoading ? (
@@ -216,20 +185,7 @@ export default function PedidosReviewScreen() {
           ) : (
             <MaterialCommunityIcons name="check-circle" size={16} color="#fff" />
           )}
-          <Text style={styles.btnConfirmarLabel}>Confirmar orden</Text>
-        </Pressable>
-
-        <Pressable
-          onPress={onRechazar}
-          disabled={actionLoading || otroTieneLock}
-          style={({ pressed }) => [
-            styles.btnRechazar,
-            (actionLoading || otroTieneLock) && { opacity: 0.45 },
-            pressed && { opacity: 0.75 },
-          ]}
-        >
-          <MaterialCommunityIcons name="close-circle-outline" size={16} color={C.danger} />
-          <Text style={styles.btnRechazarLabel}>Rechazar</Text>
+          <Text style={styles.btnFinalizarLabel}>Finalizar</Text>
         </Pressable>
       </View>
 
@@ -266,7 +222,7 @@ const styles = StyleSheet.create({
   progresoTotal: { fontSize: 15, fontWeight: '600', color: C.textSec },
 
   barraWrap: { height: 4, backgroundColor: C.border, borderRadius: 4, overflow: 'hidden' },
-  barraFill: { height: 4, backgroundColor: C.primary, borderRadius: 4 },
+  barraFill: { height: 4, borderRadius: 4 },
 
   avisoPendiente: {
     flexDirection: 'row',
@@ -310,7 +266,7 @@ const styles = StyleSheet.create({
   },
   btnScanLabel: { color: '#fff', fontWeight: '700', fontSize: 15, letterSpacing: 0.2 },
 
-  btnConfirmar: {
+  btnFinalizar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -319,18 +275,5 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 13,
   },
-  btnConfirmarLabel: { color: '#fff', fontWeight: '700', fontSize: 15 },
-
-  btnRechazar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: S.sm,
-    backgroundColor: C.surface,
-    borderRadius: 14,
-    paddingVertical: 12,
-    borderWidth: 1.5,
-    borderColor: C.danger,
-  },
-  btnRechazarLabel: { color: C.danger, fontWeight: '700', fontSize: 14 },
+  btnFinalizarLabel: { color: '#fff', fontWeight: '700', fontSize: 15 },
 });
