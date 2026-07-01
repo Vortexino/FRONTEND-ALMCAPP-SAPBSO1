@@ -37,8 +37,10 @@ export async function getDispatch(dispatchId) {
   return { ...data.data, dispatchId: data.data.id };
 }
 
-// Lista facturas abiertas en SAP (OINV) del almacén del usuario.
-export async function fetchInvoices() {
-  const { data } = await axiosClient.get('/dispatch/invoices');
+// Lista facturas del almacén. statusFilter: 'all' | 'pending' | 'active' | 'completed'
+export async function fetchInvoices(statusFilter = 'all') {
+  const { data } = await axiosClient.get('/dispatch/invoices', {
+    params: { status: statusFilter },
+  });
   return data; // { success, total, data: InvoiceSummary[] }
 }

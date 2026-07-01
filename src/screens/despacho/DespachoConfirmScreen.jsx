@@ -48,9 +48,11 @@ export default function DespachoConfirmScreen() {
 
   if (!dispatchActual) return null;
 
-  // progress del backend (0-100) tiene precedencia
-  const progressPct = dispatchActual.progress
-    ?? (resumen.total > 0 ? Math.round(((resumen.completados + resumen.faltantes) / resumen.total) * 100) : 0);
+  // Calcular siempre desde el estado local: el backend solo cuenta items picked,
+  // no conoce los faltantes (que son solo de UI). Su .progress quedaría desactualizado.
+  const progressPct = resumen.total > 0
+    ? Math.round(((resumen.completados + resumen.faltantes) / resumen.total) * 100)
+    : 0;
 
   return (
     <View style={styles.container}>
@@ -75,7 +77,7 @@ export default function DespachoConfirmScreen() {
 
         {/* Barra de progreso */}
         <View style={styles.barraWrap}>
-          <View style={[styles.barraFill, { width: `${progressPct}%` }]} />
+          <View style={[styles.barraFill, { width: `${progressPct}%`, backgroundColor: progressPct === 100 ? C.success : C.primary }]} />
         </View>
         <Text style={styles.barraLabel}>
           {resumen.completados + resumen.faltantes} de {resumen.total} artículos revisados
@@ -171,7 +173,7 @@ const styles = StyleSheet.create({
   docNum: { fontSize: 18, fontWeight: '700', color: C.text, letterSpacing: -0.3 },
   cliente: { fontSize: 14, color: C.textSec },
   barraWrap: { height: 6, backgroundColor: C.border, borderRadius: 6, overflow: 'hidden', marginTop: S.xs },
-  barraFill: { height: 6, backgroundColor: C.primary, borderRadius: 6 },
+  barraFill: { height: 6, borderRadius: 6 },
   barraLabel: { fontSize: 12, color: C.textMuted, textAlign: 'right' },
 
   seccion: {
