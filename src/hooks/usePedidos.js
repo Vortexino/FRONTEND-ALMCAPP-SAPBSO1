@@ -17,6 +17,7 @@ export function usePedidos() {
   const setOrders = usePedidosStore((s) => s.setOrders);
   const setOrderActual = usePedidosStore((s) => s.setOrderActual);
   const updateOrderActual = usePedidosStore((s) => s.updateOrderActual);
+  const optimisticUpdateItem = usePedidosStore((s) => s.optimisticUpdateItem);
   const resetOrderActual = usePedidosStore((s) => s.resetOrderActual);
   const user = useAuthStore((s) => s.user);
 
@@ -67,30 +68,44 @@ export function usePedidos() {
 
   const actualizarItem = useCallback(
     async (orderId, lineNum, cambios) => {
+      // Actualización optimista inmediata — igual que marcarFaltante en Despacho.
+      // La UI refleja el cambio antes de que responda la red.
+      optimisticUpdateItem(lineNum, cambios);
       try {
         const order = await pedidosService.updateItem(orderId, lineNum, cambios);
-        updateOrderActual(order);
+        updateOrderActual(order); // reemplaza con estado real del backend
         return { ok: true };
       } catch (error) {
         return { ok: false, error: extraerMensajeError(error) };
       }
     },
-    [updateOrderActual]
+    [updateOrderActual, optimisticUpdateItem]
   );
 
   // Escaneo físico de un artículo durante revisión: POST /orders/:id/items/scan
   // El backend consulta stock SAP en tiempo real y actualiza el item con su availability.
   const escanearItem = useCallback(
-    async (orderId, itemCode) => {
+    async (orderId, scannedCode) => {
+      // Actualización optimista del contador — mismo patrón que aplicarResultadoEscaneo en Despacho.
+      if (orderActual) {
+        const matchingItem = orderActual.items.find(
+          (i) => i.itemCode === scannedCode || (i.barCode && i.barCode === scannedCode)
+        );
+        if (matchingItem) {
+          optimisticUpdateItem(matchingItem.lineNum, {
+            scannedQty: (matchingItem.scannedQty ?? 0) + 1,
+          });
+        }
+      }
       try {
-        const order = await pedidosService.scanOrderItem(orderId, itemCode);
+        const order = await pedidosService.scanOrderItem(orderId, scannedCode);
         updateOrderActual(order);
         return { ok: true };
       } catch (error) {
         return { ok: false, error: extraerMensajeError(error) };
       }
     },
-    [updateOrderActual]
+    [orderActual, updateOrderActual, optimisticUpdateItem]
   );
 
   const confirmarPedido = useCallback(

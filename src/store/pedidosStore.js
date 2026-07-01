@@ -40,5 +40,20 @@ export const usePedidosStore = create((set) => ({
       };
     }),
 
+  // Actualización optimista de un item — mismo patrón que marcarFaltante en despachoStore.
+  // El hook lo aplica antes del API call para que la UI cambie sin esperar la red.
+  optimisticUpdateItem: (lineNum, changes) =>
+    set((state) => {
+      if (!state.orderActual) return {};
+      return {
+        orderActual: {
+          ...state.orderActual,
+          items: state.orderActual.items.map((item) =>
+            item.lineNum === lineNum ? { ...item, ...changes } : item
+          ),
+        },
+      };
+    }),
+
   resetOrderActual: () => set({ orderActual: null }),
 }));

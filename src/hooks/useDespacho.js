@@ -32,11 +32,11 @@ export function useDespacho() {
 
   const user = useAuthStore((s) => s.user);
 
-  // Facturas abiertas en SAP (OINV) listas para despachar.
-  const fetchDocumentos = useCallback(async () => {
+  // Facturas del almacén. statusFilter: 'all' | 'pending' | 'active' | 'completed'
+  const fetchDocumentos = useCallback(async (statusFilter = 'all') => {
     setEstadoUI({ loading: true, error: null });
     try {
-      const res = await despachoService.fetchInvoices();
+      const res = await despachoService.fetchInvoices(statusFilter);
       setDocumentos(res.data ?? []);
       setEstadoUI({ loading: false, error: null });
     } catch {
@@ -117,6 +117,15 @@ export function useDespacho() {
 
       if (item.estado === ESTADOS_ARTICULO.COMPLETADO) {
         return { ok: false, motivo: 'ya_completado' };
+      }
+
+      // Flujo secuencial: solo se puede escanear el item sugerido (itemActual).
+      // El backend también lo valida, pero lo chequeamos aquí para dar feedback inmediato.
+      if (itemActual && item.itemCode !== itemActual) {
+        vibrarErrorEscaneo();
+        marcarErrorEscaneoStore(itemActual);
+        setTimeout(() => revertirErrorEscaneoStore(itemActual), 1500);
+        return { ok: false, motivo: 'orden_incorrecto' };
       }
 
       setEstadoUI({ loading: true, error: null });

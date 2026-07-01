@@ -1,39 +1,38 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
-import { ActivityIndicator, Text } from 'react-native-paper';
+import { ActivityIndicator, Text, TextInput } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import Toast from 'react-native-toast-message';
 import { usePedidos } from '../../hooks/usePedidos';
 import OrderCard from '../../components/pedidos/OrderCard';
+import FilterBar from '../../components/shared/FilterBar';
+import BarcodeScannerView from '../../components/despacho/BarcodeScannerView';
 import { ROUTES } from '../../constants/routes';
 import { ORDER_STATUS } from '../../store/pedidosStore';
 import { C, S, shadow } from '../../constants/theme';
 
 const FILTROS = [
-  { label: 'Todos',       value: null },
-  { label: 'Por revisar', value: `${ORDER_STATUS.RECEIVED},${ORDER_STATUS.REVIEWING}` },
-  { label: 'Confirmadas', value: `${ORDER_STATUS.CONFIRMED},${ORDER_STATUS.PARTIAL}` },
-  { label: 'Rechazadas',  value: ORDER_STATUS.REJECTED },
+  { label: 'Todos',        value: null },
+  { label: 'Por revisar',  value: ORDER_STATUS.RECEIVED },
+  { label: 'En revisión',  value: ORDER_STATUS.REVIEWING },
+  { label: 'Confirmado',   value: `${ORDER_STATUS.CONFIRMED},${ORDER_STATUS.PARTIAL}` },
 ];
 
 const POLL_INTERVAL = 30_000;
 
-function FilterChip({ label, active, onPress }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.chip,
-        active && styles.chipActive,
-        pressed && { opacity: 0.75 },
-      ]}
-    >
-      <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function EmptyState() {
+function EmptyState({ query }) {
+  if (query?.trim()) {
+    return (
+      <View style={styles.emptyWrap}>
+        <View style={styles.emptyCircle}>
+          <MaterialCommunityIcons name="magnify" size={28} color={C.textMuted} />
+        </View>
+        <Text style={styles.emptyTitle}>Sin resultados para "{query.trim()}"</Text>
+        <Text style={styles.emptySub}>Probá con otro número o cambiá el filtro activo.</Text>
+      </View>
+    );
+  }
   return (
     <View style={styles.emptyWrap}>
       <View style={styles.emptyCircle}>
@@ -50,6 +49,8 @@ export default function PedidosListScreen() {
   const { orders, estadoUI, fetchOrders } = usePedidos();
   const [filtro, setFiltro] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [query, setQuery] = useState('');
+  const [scannerVisible, setScannerVisible] = useState(false);
   const intervalRef = useRef(null);
 
   useEffect(() => {
@@ -71,26 +72,75 @@ export default function PedidosListScreen() {
     intervalRef.current = setInterval(() => fetchOrders(valor), POLL_INTERVAL);
   }, [fetchOrders]);
 
+  // Filtra en tiempo real: muestra todo lo que contenga los dígitos escritos.
+  const ordenesFiltradas = useMemo(() => {
+    const q = query.trim();
+    if (!q) return orders;
+    return orders.filter((o) => String(o.docNum).includes(q));
+  }, [orders, query]);
+
   const irADetalle = useCallback(
     (order) => navigation.navigate(ROUTES.PEDIDOS_DETAIL, { orderId: order.id }),
     [navigation]
   );
 
+  // "Ir" o submit: requiere match exacto (no tiene fallback de API como Despacho).
+  const irPorDocNum = useCallback((docNum) => {
+    const exacto = orders.find((o) => String(o.docNum) === String(docNum).trim());
+    if (exacto) {
+      navigation.navigate(ROUTES.PEDIDOS_DETAIL, { orderId: exacto.id });
+    } else {
+      Toast.show({ type: 'info', text1: `Orden #${docNum} no encontrada`, text2: 'Verificá el número o cambiá el filtro activo.' });
+    }
+  }, [orders, navigation]);
+
+  const onBuscarManual = useCallback(() => {
+    const num = query.trim();
+    if (!num) return;
+    irPorDocNum(num);
+  }, [query, irPorDocNum]);
+
+  const onCodigoEscaneado = useCallback((codigo) => {
+    setScannerVisible(false);
+    irPorDocNum(codigo);
+  }, [irPorDocNum]);
+
   return (
     <View style={styles.container}>
-      {/* Filtros */}
-      <View style={styles.filtrosWrap}>
-        {FILTROS.map((f) => (
-          <FilterChip
-            key={String(f.value)}
-            label={f.label}
-            active={filtro === f.value}
-            onPress={() => onCambiarFiltro(f.value)}
-          />
-        ))}
+      {/* Búsqueda por número de orden */}
+      <View style={styles.searchWrap}>
+        <TextInput
+          style={styles.searchInput}
+          mode="outlined"
+          placeholder="Número de orden"
+          value={query}
+          onChangeText={setQuery}
+          onSubmitEditing={onBuscarManual}
+          keyboardType="numeric"
+          returnKeyType="go"
+          outlineStyle={{ borderRadius: 12 }}
+          activeOutlineColor={C.primary}
+          outlineColor={C.border}
+          left={<TextInput.Icon icon="magnify" color={C.textMuted} />}
+        />
+        <Pressable
+          onPress={() => setScannerVisible(true)}
+          style={({ pressed }) => [styles.scanBtn, pressed && { opacity: 0.7 }]}
+        >
+          <MaterialCommunityIcons name="barcode-scan" size={22} color={C.primary} />
+        </Pressable>
+        {query.trim().length > 0 && (
+          <Pressable
+            onPress={onBuscarManual}
+            style={({ pressed }) => [styles.goBtn, pressed && { opacity: 0.8 }]}
+          >
+            <Text style={styles.goBtnLabel}>Ir</Text>
+          </Pressable>
+        )}
       </View>
 
-      {/* Error inline */}
+      <FilterBar opciones={FILTROS} seleccionado={filtro} onChange={onCambiarFiltro} />
+
       {estadoUI.error && (
         <Pressable onPress={() => fetchOrders(filtro)} style={styles.errorBanner}>
           <MaterialCommunityIcons name="wifi-off" size={14} color={C.danger} />
@@ -102,10 +152,10 @@ export default function PedidosListScreen() {
         <ActivityIndicator style={styles.loader} color={C.primary} />
       ) : (
         <FlatList
-          data={orders}
+          data={ordenesFiltradas}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => <OrderCard order={item} onPress={() => irADetalle(item)} />}
-          ListEmptyComponent={<EmptyState />}
+          ListEmptyComponent={<EmptyState query={query} />}
           contentContainerStyle={styles.lista}
           refreshControl={
             <RefreshControl
@@ -117,6 +167,13 @@ export default function PedidosListScreen() {
           }
         />
       )}
+
+      <BarcodeScannerView
+        visible={scannerVisible}
+        onClose={() => setScannerVisible(false)}
+        onScanned={onCodigoEscaneado}
+        title="Escanea el código de la orden"
+      />
     </View>
   );
 }
@@ -124,8 +181,9 @@ export default function PedidosListScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bg },
 
-  filtrosWrap: {
+  searchWrap: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: S.sm,
     paddingHorizontal: S.base,
     paddingVertical: S.md,
@@ -133,20 +191,22 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderBottomColor: C.border,
   },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: C.bg,
-    borderWidth: 1,
-    borderColor: C.border,
+  searchInput: { flex: 1, backgroundColor: C.surface, height: 44 },
+  scanBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: C.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  chipActive: {
+  goBtn: {
+    paddingHorizontal: S.md,
+    paddingVertical: S.sm,
+    borderRadius: 10,
     backgroundColor: C.primary,
-    borderColor: C.primary,
   },
-  chipLabel: { fontSize: 12, fontWeight: '600', color: C.textSec },
-  chipLabelActive: { color: '#fff' },
+  goBtnLabel: { color: '#fff', fontWeight: '700', fontSize: 13 },
 
   errorBanner: {
     flexDirection: 'row',

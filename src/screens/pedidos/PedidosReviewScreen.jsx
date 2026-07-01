@@ -11,7 +11,7 @@ import BarcodeScannerView from '../../components/despacho/BarcodeScannerView';
 import HidScannerInput from '../../components/shared/HidScannerInput';
 import { ITEM_AVAILABILITY, ORDER_STATUS } from '../../store/pedidosStore';
 import { ROUTES } from '../../constants/routes';
-import { C, S, shadow } from '../../constants/theme';
+import { C, S } from '../../constants/theme';
 
 export default function PedidosReviewScreen() {
   const navigation = useNavigation();
@@ -24,7 +24,6 @@ export default function PedidosReviewScreen() {
   const [scanLoading, setScanLoading] = useState(false);
   const hidRef = useRef(null);
 
-  // Vuelve a enfocar el scanner HID cuando se cierra el modal de cámara
   useEffect(() => {
     if (!scannerVisible) {
       setTimeout(() => hidRef.current?.focus(), 150);
@@ -47,7 +46,6 @@ export default function PedidosReviewScreen() {
     [orderId, actualizarItem]
   );
 
-  // Escaneo de código de barras → POST /orders/:id/items/scan
   const onCodigoEscaneado = useCallback(
     async (codigo) => {
       setScannerVisible(false);
@@ -112,31 +110,34 @@ export default function PedidosReviewScreen() {
 
   if (!orderActual) return null;
 
-  // Solo el dueño del lock puede confirmar o rechazar (backend valida con 409).
   const lock = orderActual?.lock;
   const lockOwner = lock?.lockedBy ?? lock?.userId ?? lock?.user_id ?? lock?.user
     ?? lock?.reviewedBy ?? lock?.reviewed_by ?? lock?.createdBy ?? lock?.created_by
     ?? orderActual?.reviewed_by ?? orderActual?.reviewedBy;
   const esMiLock = !!lockOwner && lockOwner === user?.userId;
-  // Solo bloquear si conocemos al dueño del lock Y no soy yo.
   const otroTieneLock = !!lockOwner && !esMiLock;
 
+  const hayDisponibles = orderActual.items?.some(
+    (i) => i.availability === ITEM_AVAILABILITY.AVAILABLE
+  );
   const puedeConfirmar =
     !otroTieneLock &&
     !hayPendientes &&
+    hayDisponibles &&
     orderActual.status !== ORDER_STATUS.CONFIRMED &&
     orderActual.status !== ORDER_STATUS.REJECTED;
 
   const revisados = orderActual.items?.filter((i) => i.availability !== ITEM_AVAILABILITY.PENDING).length ?? 0;
   const total = orderActual.items?.length ?? 0;
   const pct = total > 0 ? revisados / total : 0;
+  const primerPendiente = orderActual.items?.find((i) => i.availability === ITEM_AVAILABILITY.PENDING);
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.encabezado}>
-        <View style={styles.encabezadoTop}>
-          <View>
+      {/* Header — mismo formato que DespachoDetailScreen */}
+      <View style={styles.header}>
+        <View style={styles.headerRow}>
+          <View style={{ flex: 1 }}>
             <Text style={styles.docNum}>Orden #{orderActual.docNum}</Text>
             <Text style={styles.cliente}>{orderActual.cardName}</Text>
           </View>
@@ -146,12 +147,9 @@ export default function PedidosReviewScreen() {
             <Text style={styles.progresoTotal}>{total}</Text>
           </View>
         </View>
-
-        {/* Barra de progreso */}
         <View style={styles.barraWrap}>
           <View style={[styles.barraFill, { width: `${Math.round(pct * 100)}%` }]} />
         </View>
-
         {hayPendientes && (
           <View style={styles.avisoPendiente}>
             <MaterialCommunityIcons name="clock-outline" size={13} color={C.warn} />
@@ -160,25 +158,6 @@ export default function PedidosReviewScreen() {
             </Text>
           </View>
         )}
-
-        {/* Botón escanear */}
-        <Pressable
-          onPress={() => setScannerVisible(true)}
-          disabled={scanLoading}
-          style={({ pressed }) => [
-            styles.btnScan,
-            (pressed || scanLoading) && { opacity: 0.75 },
-          ]}
-        >
-          {scanLoading ? (
-            <ActivityIndicator size="small" color={C.primary} />
-          ) : (
-            <MaterialCommunityIcons name="barcode-scan" size={16} color={C.primary} />
-          )}
-          <Text style={styles.btnScanLabel}>
-            {scanLoading ? 'Consultando stock…' : 'Escanear artículo'}
-          </Text>
-        </Pressable>
       </View>
 
       {estadoUI.error && (
@@ -191,14 +170,38 @@ export default function PedidosReviewScreen() {
       <FlatList
         data={orderActual.items}
         keyExtractor={(item) => String(item.lineNum)}
+        extraData={actionLoading}
         renderItem={({ item }) => (
-          <ItemAvailabilityRow item={item} onUpdate={onActualizar} disabled={actionLoading || scanLoading} />
+          <ItemAvailabilityRow
+            item={item}
+            onUpdate={onActualizar}
+            disabled={actionLoading}
+            sugerido={item.lineNum === primerPendiente?.lineNum}
+          />
         )}
         contentContainerStyle={styles.lista}
       />
 
-      {/* Footer */}
+      {/* Footer — mismo layout que DespachoDetailScreen */}
       <View style={styles.footer}>
+        <Pressable
+          onPress={() => setScannerVisible(true)}
+          disabled={scanLoading}
+          style={({ pressed }) => [
+            styles.btnScan,
+            (pressed || scanLoading) && { opacity: 0.8 },
+          ]}
+        >
+          {scanLoading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <MaterialCommunityIcons name="barcode-scan" size={18} color="#fff" />
+          )}
+          <Text style={styles.btnScanLabel}>
+            {scanLoading ? 'Consultando stock…' : 'Escanear artículo'}
+          </Text>
+        </Pressable>
+
         <Pressable
           onPress={onConfirmar}
           disabled={!puedeConfirmar || actionLoading}
@@ -230,7 +233,6 @@ export default function PedidosReviewScreen() {
         </Pressable>
       </View>
 
-      {/* Scanner HID: siempre activo en pantalla para scanners físicos Bluetooth/USB */}
       <HidScannerInput inputRef={hidRef} onScanned={onCodigoEscaneado} />
 
       <BarcodeScannerView
@@ -247,14 +249,14 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bg },
   centrado: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
-  encabezado: {
+  header: {
     backgroundColor: C.surface,
     padding: S.base,
     gap: S.sm,
     borderBottomWidth: 0.5,
     borderBottomColor: C.border,
   },
-  encabezadoTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   docNum: { fontSize: 17, fontWeight: '700', color: C.text, letterSpacing: -0.3 },
   cliente: { fontSize: 13, color: C.textSec, marginTop: 2 },
 
@@ -277,20 +279,6 @@ const styles = StyleSheet.create({
   },
   avisoTexto: { fontSize: 12, color: C.warn, fontWeight: '600', flex: 1 },
 
-  btnScan: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: S.xs,
-    paddingVertical: 9,
-    paddingHorizontal: S.md,
-    borderRadius: 10,
-    backgroundColor: C.primaryLight,
-    borderWidth: 1,
-    borderColor: C.primary + '40',
-  },
-  btnScanLabel: { fontSize: 13, fontWeight: '700', color: C.primary },
-
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -311,6 +299,17 @@ const styles = StyleSheet.create({
     borderTopWidth: 0.5,
     borderTopColor: C.border,
   },
+  btnScan: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: S.sm,
+    backgroundColor: C.primary,
+    borderRadius: 14,
+    paddingVertical: 14,
+  },
+  btnScanLabel: { color: '#fff', fontWeight: '700', fontSize: 15, letterSpacing: 0.2 },
+
   btnConfirmar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -318,7 +317,7 @@ const styles = StyleSheet.create({
     gap: S.sm,
     backgroundColor: C.success,
     borderRadius: 14,
-    paddingVertical: 14,
+    paddingVertical: 13,
   },
   btnConfirmarLabel: { color: '#fff', fontWeight: '700', fontSize: 15 },
 

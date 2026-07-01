@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -23,13 +23,20 @@ export default function BarcodeScannerView({ visible, onClose, onScanned, title 
     if (visible) bloqueado.current = false;
   }, [visible]);
 
-  if (!visible) return null;
-
-  const handleScan = ({ data }) => {
+  // Deben estar antes del early-return para no violar las reglas de hooks.
+  // bloqueado es un ref (estable); onScanned se estabiliza con useCallback en el padre.
+  const handleScan = useCallback(({ data }) => {
     if (bloqueado.current) return;
     bloqueado.current = true;
     onScanned(data);
-  };
+  }, [onScanned]);
+
+  // HidScannerInput llama onScanned(code: string) directamente (sin envolver en objeto).
+  const handleScanHid = useCallback((code) => {
+    handleScan({ data: code });
+  }, [handleScan]);
+
+  if (!visible) return null;
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -56,7 +63,7 @@ export default function BarcodeScannerView({ visible, onClose, onScanned, title 
         ) : (
           <>
             {/* Scanner físico HID: captura input de teclado mientras el modal está abierto */}
-            <HidScannerInput onScanned={(code) => handleScan({ data: code })} />
+            <HidScannerInput onScanned={handleScanHid} />
 
             <CameraView
               style={styles.camera}

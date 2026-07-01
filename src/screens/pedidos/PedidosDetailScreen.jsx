@@ -161,12 +161,16 @@ export default function PedidosDetailScreen() {
           <InfoRow
             icon="calendar"
             label="Fecha"
-            value={new Date(orderActual.docDate).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}
+            value={orderActual.docDate
+              ? new Date(orderActual.docDate).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })
+              : '—'}
           />
           <InfoRow
             icon="calendar-clock"
             label="Vence"
-            value={new Date(orderActual.docDueDate).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}
+            value={orderActual.docDueDate
+              ? new Date(orderActual.docDueDate).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })
+              : '—'}
           />
           {orderActual.notes && (
             <InfoRow icon="note-text" label="Nota" value={orderActual.notes} />
