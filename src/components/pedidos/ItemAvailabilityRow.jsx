@@ -22,11 +22,6 @@ export default function ItemAvailabilityRow({ item, onUpdate, disabled, sugerido
   const pendiente  = availability === ITEM_AVAILABILITY.PENDING;
   const disponible = availability === ITEM_AVAILABILITY.AVAILABLE;
   const faltante   = availability === ITEM_AVAILABILITY.UNAVAILABLE;
-  // Siempre mostrar acciones — cada estado permite cambiar a los otros
-  const mostrarFaltante = pendiente || disponible;   // faltante aún no está → lo puede marcar
-  const mostrarVisual   = pendiente || faltante;     // no está disponible aún → puede confirmar
-  const mostrarAsignar  = pendiente || faltante;     // no escaneado aún → puede asignar código
-
   const cfg = AVAIL_CFG[availability] ?? AVAIL_CFG[ITEM_AVAILABILITY.PENDING];
 
   const acentoColor = sugerido   ? C.primary
@@ -34,8 +29,8 @@ export default function ItemAvailabilityRow({ item, onUpdate, disabled, sugerido
     : faltante   ? C.danger
     : C.border;
 
-  const scanned = item.scannedQty ?? 0;
-  const contadorVerde = item.quantity > 0 && scanned >= item.quantity;
+  const scanned = disponible ? item.quantity : (item.scannedQty ?? 0);
+  const contadorVerde = disponible || (item.quantity > 0 && scanned >= item.quantity);
 
   const onAsignarSuccess = useCallback(() => {
     setTieneBarcode(true);
@@ -45,11 +40,11 @@ export default function ItemAvailabilityRow({ item, onUpdate, disabled, sugerido
   const onPresConfirmarVisual = useCallback(() => {
     Alert.alert(
       'Confirmación Visual',
-      `¿Marcar ${item.itemCode} como Disponible sin escanear su código de barras?`,
+      `¿Marcar ${item.itemCode} como listo sin escanear su código de barras?`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
-          text: 'Sí, marcar disponible',
+          text: 'Sí, marcar listo',
           onPress: async () => {
             setLoadingVisual(true);
             await onUpdate(item.lineNum, { availability: ITEM_AVAILABILITY.AVAILABLE });
@@ -60,20 +55,9 @@ export default function ItemAvailabilityRow({ item, onUpdate, disabled, sugerido
     );
   }, [item.itemCode, item.lineNum, onUpdate]);
 
-  const onPresFaltante = useCallback(() => {
-    Alert.alert(
-      'Marcar como Faltante',
-      `¿El artículo ${item.itemCode} no está disponible en el almacén?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Sí, marcar faltante',
-          style: 'destructive',
-          onPress: () => onUpdate(item.lineNum, { availability: ITEM_AVAILABILITY.UNAVAILABLE }),
-        },
-      ]
-    );
-  }, [item.itemCode, item.lineNum, onUpdate]);
+  const onPresDeshacer = useCallback(() => {
+    onUpdate(item.lineNum, { availability: ITEM_AVAILABILITY.PENDING });
+  }, [item.lineNum, onUpdate]);
 
   return (
     <>
@@ -96,7 +80,7 @@ export default function ItemAvailabilityRow({ item, onUpdate, disabled, sugerido
                       <Text style={styles.nextLabel}>SIGUIENTE</Text>
                     </View>
                   )}
-                  <Text style={styles.codigo}>{item.itemCode}</Text>
+                  <Text style={[styles.codigo, disponible && styles.codigoCompletado]}>{item.itemCode}</Text>
                 </View>
                 {(tieneBarcode && item.barCode) ? (
                   <Text style={styles.barCode}>{item.barCode}</Text>
@@ -135,9 +119,9 @@ export default function ItemAvailabilityRow({ item, onUpdate, disabled, sugerido
               </View>
             ) : null}
 
-            {/* Acciones — siempre visibles para permitir correcciones en cualquier estado */}
-            <View style={styles.accionesRow}>
-              {mostrarAsignar && (
+            {/* Acciones — solo cuando hay algo que mostrar */}
+            {pendiente && (
+              <View style={styles.accionesRow}>
                 <Pressable
                   onPress={() => !tieneBarcode && setAssignModalVisible(true)}
                   style={({ pressed }) => [
@@ -156,9 +140,7 @@ export default function ItemAvailabilityRow({ item, onUpdate, disabled, sugerido
                     {tieneBarcode ? 'Código asignado' : 'Asignar código'}
                   </Text>
                 </Pressable>
-              )}
 
-              {mostrarVisual && (
                 <Pressable
                   onPress={onPresConfirmarVisual}
                   disabled={loadingVisual || disabled}
@@ -173,23 +155,19 @@ export default function ItemAvailabilityRow({ item, onUpdate, disabled, sugerido
                     : <MaterialCommunityIcons name="eye-check-outline" size={13} color={C.info} />}
                   <Text style={styles.accionLabelVisual}>Visual</Text>
                 </Pressable>
-              )}
+              </View>
+            )}
 
-              {mostrarFaltante && (
-                <Pressable
-                  onPress={onPresFaltante}
-                  disabled={disabled}
-                  style={({ pressed }) => [
-                    styles.accionBtn,
-                    styles.accionBtnFaltante,
-                    (pressed || disabled) && { opacity: 0.65 },
-                  ]}
-                >
-                  <MaterialCommunityIcons name="package-variant-remove" size={13} color={C.danger} />
-                  <Text style={styles.accionLabelFaltante}>Faltante</Text>
-                </Pressable>
-              )}
-            </View>
+            {disponible && (
+              <Pressable
+                onPress={onPresDeshacer}
+                disabled={disabled}
+                style={({ pressed }) => [styles.deshacerBtn, (pressed || disabled) && { opacity: 0.65 }]}
+              >
+                <MaterialCommunityIcons name="undo-variant" size={13} color={C.textSec} />
+                <Text style={styles.deshacerLabel}>Deshacer</Text>
+              </Pressable>
+            )}
           </View>
         </View>
       </View>
@@ -225,6 +203,7 @@ const styles = StyleSheet.create({
   topRow: { flexDirection: 'row', alignItems: 'flex-start', gap: S.md },
   codigoRow: { flexDirection: 'row', alignItems: 'center', gap: S.xs, flexWrap: 'wrap' },
   codigo: { fontSize: 15, fontWeight: '700', color: C.text, letterSpacing: -0.2 },
+  codigoCompletado: { color: C.textSec, textDecorationLine: 'line-through' },
   nextBadge: { backgroundColor: C.primary, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
   nextLabel: { fontSize: 9, fontWeight: '800', color: '#fff', letterSpacing: 0.6 },
   barCode: { fontSize: 11, color: C.textMuted, letterSpacing: 0.5, fontVariant: ['tabular-nums'] },
@@ -263,10 +242,22 @@ const styles = StyleSheet.create({
   },
   accionBtnAsignar:  { backgroundColor: C.primaryLight },
   accionBtnVisual:   { backgroundColor: C.infoLight },
-  accionBtnFaltante: { backgroundColor: C.dangerLight },
   accionBtnDisabled: { backgroundColor: C.bg },
   accionLabel:         { fontSize: 11, fontWeight: '600', color: C.primary },
   accionLabelDisabled: { fontSize: 11, fontWeight: '600', color: C.textMuted },
   accionLabelVisual:   { fontSize: 11, fontWeight: '600', color: C.info },
-  accionLabelFaltante: { fontSize: 11, fontWeight: '600', color: C.danger },
+
+  deshacerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    alignSelf: 'flex-start',
+    paddingHorizontal: S.sm,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: C.bg,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  deshacerLabel: { fontSize: 11, fontWeight: '600', color: C.textSec },
 });

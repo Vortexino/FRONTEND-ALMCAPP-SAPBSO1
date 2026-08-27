@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Text } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -16,17 +16,17 @@ export default function PedidosReviewScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const { orderId } = route.params ?? {};
-  const { orderActual, estadoUI, user, fetchOrder, escanearItem, actualizarItem, confirmarPedido } =
-    usePedidos();
+  const {
+    orderActual, estadoUI, user,
+    fetchOrder, escanearItem, actualizarItem, confirmarPedido, resetOrderActual,
+  } = usePedidos();
   const [actionLoading, setActionLoading] = useState(false);
   const [scannerVisible, setScannerVisible] = useState(false);
   const [scanLoading, setScanLoading] = useState(false);
   const hidRef = useRef(null);
 
   useEffect(() => {
-    if (!scannerVisible) {
-      setTimeout(() => hidRef.current?.focus(), 150);
-    }
+    if (!scannerVisible) setTimeout(() => hidRef.current?.focus(), 150);
   }, [scannerVisible]);
 
   useEffect(() => {
@@ -74,6 +74,23 @@ export default function PedidosReviewScreen() {
     }
   }, [orderId, confirmarPedido, navigation]);
 
+  const onCancelar = useCallback(() => {
+    Alert.alert(
+      'Cancelar revisión',
+      '¿Seguro que querés cancelar? El progreso actual no se guardará.',
+      [
+        { text: 'No, continuar', style: 'cancel' },
+        {
+          text: 'Cancelar revisión',
+          style: 'destructive',
+          onPress: () => {
+            navigation.goBack();
+          },
+        },
+      ]
+    );
+  }, [resetOrderActual, navigation]);
+
   if (!orderActual && estadoUI.loading) {
     return (
       <View style={styles.centrado}>
@@ -91,7 +108,6 @@ export default function PedidosReviewScreen() {
   const esMiLock = !!lockOwner && lockOwner === user?.userId;
   const otroTieneLock = !!lockOwner && !esMiLock;
 
-  // Puede finalizar cuando no quedan pendientes — faltantes cuentan como revisados
   const puedeFinalizar =
     !otroTieneLock &&
     !hayPendientes &&
@@ -124,7 +140,7 @@ export default function PedidosReviewScreen() {
           <View style={styles.avisoPendiente}>
             <MaterialCommunityIcons name="clock-outline" size={13} color={C.warn} />
             <Text style={styles.avisoTexto}>
-              {total - revisados} artículo(s) pendiente(s) · escaneá o marcá como Faltante
+              {total - revisados} artículo(s) pendiente(s) · escaneá o confirmá visualmente
             </Text>
           </View>
         )}
@@ -133,7 +149,7 @@ export default function PedidosReviewScreen() {
       {estadoUI.error && (
         <View style={styles.errorBanner}>
           <MaterialCommunityIcons name="wifi-off" size={13} color={C.danger} />
-          <Text style={styles.errorText}>{estadoUI.error}</Text>
+          <Text style={styles.errorBannerText}>{estadoUI.error}</Text>
         </View>
       )}
 
@@ -153,40 +169,51 @@ export default function PedidosReviewScreen() {
       />
 
       <View style={styles.footer}>
-        <Pressable
-          onPress={() => setScannerVisible(true)}
-          disabled={scanLoading}
-          style={({ pressed }) => [
-            styles.btnScan,
-            (pressed || scanLoading) && { opacity: 0.8 },
-          ]}
-        >
-          {scanLoading ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <MaterialCommunityIcons name="barcode-scan" size={18} color="#fff" />
-          )}
-          <Text style={styles.btnScanLabel}>
-            {scanLoading ? 'Consultando stock…' : 'Escanear artículo'}
-          </Text>
-        </Pressable>
+        {puedeFinalizar ? (
+          <Pressable
+            onPress={onFinalizar}
+            disabled={actionLoading}
+            style={({ pressed }) => [
+              styles.btnScan,
+              styles.btnScanListo,
+              (pressed || actionLoading) && { opacity: 0.85 },
+            ]}
+          >
+            {actionLoading
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <MaterialCommunityIcons name="check-circle-outline" size={18} color="#fff" />}
+            <Text style={styles.btnScanLabel}>
+              {actionLoading ? 'Finalizando…' : 'Todos revisados — Finalizar'}
+            </Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            onPress={() => setScannerVisible(true)}
+            disabled={scanLoading}
+            style={({ pressed }) => [
+              styles.btnScan,
+              (pressed || scanLoading) && { opacity: 0.85 },
+            ]}
+          >
+            {scanLoading
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <MaterialCommunityIcons name="barcode-scan" size={18} color="#fff" />}
+            <Text style={styles.btnScanLabel}>
+              {scanLoading ? 'Consultando stock…' : 'Escanear artículo'}
+            </Text>
+          </Pressable>
+        )}
 
-        <Pressable
-          onPress={onFinalizar}
-          disabled={!puedeFinalizar || actionLoading}
-          style={({ pressed }) => [
-            styles.btnFinalizar,
-            (!puedeFinalizar || actionLoading) && { opacity: 0.45 },
-            pressed && puedeFinalizar && { opacity: 0.8 },
-          ]}
-        >
-          {actionLoading ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <MaterialCommunityIcons name="check-circle" size={16} color="#fff" />
-          )}
-          <Text style={styles.btnFinalizarLabel}>Finalizar</Text>
-        </Pressable>
+        <View style={styles.footerRow}>
+          <View style={{ flex: 1 }} />
+          <Pressable
+            onPress={onCancelar}
+            style={({ pressed }) => [styles.btnCancelar, pressed && { opacity: 0.7 }]}
+          >
+            <MaterialCommunityIcons name="close" size={14} color={C.danger} />
+            <Text style={styles.btnCancelarLabel}>Cancelar</Text>
+          </Pressable>
+        </View>
       </View>
 
       <HidScannerInput inputRef={hidRef} onScanned={onCodigoEscaneado} />
@@ -244,7 +271,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.dangerLight,
     borderRadius: 10,
   },
-  errorText: { fontSize: 13, color: C.danger },
+  errorBannerText: { fontSize: 13, color: C.danger, flex: 1 },
 
   lista: { paddingTop: S.sm, paddingBottom: S.sm },
 
@@ -265,15 +292,21 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   btnScanLabel: { color: '#fff', fontWeight: '700', fontSize: 15, letterSpacing: 0.2 },
+  btnScanListo: { backgroundColor: C.success },
 
-  btnFinalizar: {
+  footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: S.sm,
-    backgroundColor: C.success,
-    borderRadius: 14,
-    paddingVertical: 13,
+    justifyContent: 'space-between',
   },
-  btnFinalizarLabel: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  btnCancelar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: S.sm,
+    borderRadius: 8,
+    backgroundColor: C.dangerLight,
+  },
+  btnCancelarLabel: { fontSize: 12, fontWeight: '600', color: C.danger },
 });

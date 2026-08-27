@@ -104,6 +104,24 @@ export const useDespachoStore = create((set, get) => ({
     set({ dispatchActual: { ...dispatchActual, invoice: { ...dispatchActual.invoice, items } } });
   },
 
+  revertirCompletado: (itemCode) => {
+    const { dispatchActual } = get();
+    if (!dispatchActual) return;
+    const items = dispatchActual.invoice.items.map((item) =>
+      item.itemCode === itemCode && item.estado === ESTADOS_ARTICULO.COMPLETADO
+        ? { ...item, estado: ESTADOS_ARTICULO.PENDIENTE, completed: false, picked: 0 }
+        : item
+    );
+    const primerPendiente = items.find((i) => i.estado === ESTADOS_ARTICULO.PENDIENTE);
+    set({
+      dispatchActual: {
+        ...dispatchActual,
+        invoice: { ...dispatchActual.invoice, items, isFullyPicked: false },
+      },
+      itemActual: primerPendiente?.itemCode ?? null,
+    });
+  },
+
   marcarFinalizado: (status) => {
     const { dispatchActual } = get();
     if (!dispatchActual) return;

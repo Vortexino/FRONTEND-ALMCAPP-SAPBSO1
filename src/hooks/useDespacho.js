@@ -25,6 +25,7 @@ export function useDespacho() {
   const iniciarDispatchStore        = useDespachoStore((s) => s.iniciarDispatch);
   const aplicarResultadoEscaneoStore = useDespachoStore((s) => s.aplicarResultadoEscaneo);
   const marcarFaltanteStore         = useDespachoStore((s) => s.marcarFaltante);
+  const revertirCompletadoStore     = useDespachoStore((s) => s.revertirCompletado);
   const marcarErrorEscaneoStore     = useDespachoStore((s) => s.marcarErrorEscaneo);
   const revertirErrorEscaneoStore   = useDespachoStore((s) => s.revertirErrorEscaneo);
   const marcarFinalizadoStore       = useDespachoStore((s) => s.marcarFinalizado);
@@ -149,21 +150,21 @@ export function useDespacho() {
     [dispatchActual, itemActual, setEstadoUI, aplicarResultadoEscaneoStore, marcarErrorEscaneoStore, revertirErrorEscaneoStore]
   );
 
-  // Marca un item como faltante (solo estado local — no hay endpoint para esto).
   const marcarFaltante = useCallback(
     (itemCode) => marcarFaltanteStore(itemCode),
     [marcarFaltanteStore]
   );
 
-  // Todos revisados = todos los items están completos (escaneados) o marcados como faltantes.
-  // El backend también valida con isFullyPicked al llamar /dispatch/finish.
+  const revertirCompletado = useCallback(
+    (itemCode) => revertirCompletadoStore(itemCode),
+    [revertirCompletadoStore]
+  );
+
   const todosRevisados = useMemo(
     () =>
       !!dispatchActual &&
       dispatchActual.invoice.items.every(
-        (item) =>
-          item.estado === ESTADOS_ARTICULO.COMPLETADO ||
-          item.estado === ESTADOS_ARTICULO.FALTANTE
+        (item) => item.estado === ESTADOS_ARTICULO.COMPLETADO
       ),
     [dispatchActual]
   );
@@ -210,6 +211,7 @@ export function useDespacho() {
     iniciarDespacho,
     escanearArticulo,
     marcarFaltante,
+    revertirCompletado,
     confirmarDespacho,
     cancelarDespacho,
     resetDispatch,
