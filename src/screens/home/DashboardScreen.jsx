@@ -6,18 +6,11 @@ import { useDashboard } from '../../hooks/useDashboard';
 import { C, S, shadow } from '../../constants/theme';
 
 const W = Dimensions.get('window').width;
-const CHART_W = W - S.base * 2 - S.md * 2 - 2; // ancho disponible dentro de la card con padding
+const CHART_W = W - S.base * 2 - S.md * 2; // scroll padding + card padding
 
 // ── Utilidades ────────────────────────────────────────────────────────────────
 function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
-}
-
-function formatMs(ms) {
-  if (ms == null) return '—';
-  const m = Math.floor(ms / 60_000);
-  if (m >= 1) return `${m}m ${Math.round((ms % 60_000) / 1000)}s`;
-  return `${(ms / 1000).toFixed(1)}s`;
 }
 
 function formatRelTime(iso) {
@@ -85,14 +78,6 @@ function buildLineData(volume, action) {
   });
 }
 
-function buildDispatchBars(rows) {
-  return rows.map((r) => ({
-    value:      r.dispatches_completed,
-    label:      r.user_id,
-    frontColor: C.primaryDim,
-  }));
-}
-
 function buildReviewTimeBars(rows) {
   return rows.map((r) => ({
     value:      Math.round(r.avg_minutes * 10) / 10,
@@ -120,15 +105,17 @@ function SeccionLabel({ children }) {
 function ChartCard({ title, children, empty, emptyMsg = 'Sin actividad registrada' }) {
   return (
     <View style={[styles.chartCard, shadow.sm]}>
-      <Text style={styles.chartTitle}>{title}</Text>
-      {empty ? (
-        <View style={styles.emptyChart}>
-          <MaterialCommunityIcons name="chart-line" size={24} color={C.textMuted} />
-          <Text style={styles.emptyChartText}>{emptyMsg}</Text>
-        </View>
-      ) : (
-        children
-      )}
+      <View style={styles.chartCardClip}>
+        <Text style={styles.chartTitle}>{title}</Text>
+        {empty ? (
+          <View style={styles.emptyChart}>
+            <MaterialCommunityIcons name="chart-line" size={24} color={C.textMuted} />
+            <Text style={styles.emptyChartText}>{emptyMsg}</Text>
+          </View>
+        ) : (
+          children
+        )}
+      </View>
     </View>
   );
 }
@@ -214,7 +201,7 @@ function DispatchStatusPill({ status, total }) {
   );
 }
 
-function DispatchStatsRow({ row, idx, last }) {
+function DispatchStatsRow({ row, idx }) {
   return (
     <>
       {idx > 0 && <View style={styles.tableDividerLight} />}
@@ -233,22 +220,25 @@ function DispatchStatsRow({ row, idx, last }) {
   );
 }
 
-function OperatorRow({ op }) {
+function OperatorRow({ op, idx }) {
   return (
-    <View style={styles.opRow}>
-      <View style={styles.opAvatar}>
-        <MaterialCommunityIcons name="account" size={14} color={C.primaryDim} />
+    <>
+      {idx > 0 && <View style={styles.tableDividerLight} />}
+      <View style={styles.opRow}>
+        <View style={styles.opAvatar}>
+          <MaterialCommunityIcons name="account" size={14} color={C.primaryDim} />
+        </View>
+        <Text style={styles.opId} numberOfLines={1}>{op.userId}</Text>
+        <View style={styles.opStats}>
+          <Text style={styles.opTotal}>{op.total}</Text>
+          {op.errors > 0 && (
+            <View style={styles.opErrorBadge}>
+              <Text style={styles.opErrorText}>{op.errors} err</Text>
+            </View>
+          )}
+        </View>
       </View>
-      <Text style={styles.opId} numberOfLines={1}>{op.userId}</Text>
-      <View style={styles.opStats}>
-        <Text style={styles.opTotal}>{op.total}</Text>
-        {op.errors > 0 && (
-          <View style={styles.opErrorBadge}>
-            <Text style={styles.opErrorText}>{op.errors} err</Text>
-          </View>
-        )}
-      </View>
-    </View>
+    </>
   );
 }
 
@@ -259,21 +249,17 @@ export default function DashboardScreen() {
 
   const { summary, ordersByStatus, reviewTime, dispatches, dispatchStatus, volume, operators, sessions } = metrics;
 
-  // Data calculada
-  const donutData    = buildDonutData(ordersByStatus ?? []);
-  const reviewData   = buildLineData(volume ?? [], 'order_review');
+  const donutData     = buildDonutData(ordersByStatus ?? []);
+  const reviewData    = buildLineData(volume ?? [], 'order_review');
   const confirmedData = buildLineData(volume ?? [], 'order_confirmed');
-  const dispatchData = buildLineData(volume ?? [], 'dispatch_complete');
-  const dispatchBars = buildDispatchBars(dispatches ?? []);
-  const reviewBars   = buildReviewTimeBars(reviewTime ?? []);
-  const opGroups     = groupByOperator(operators ?? []);
+  const dispatchData  = buildLineData(volume ?? [], 'dispatch_complete');
+  const reviewBars    = buildReviewTimeBars(reviewTime ?? []);
+  const opGroups      = groupByOperator(operators ?? []);
 
-  const lineEmpty   = reviewData.length === 0 && confirmedData.length === 0;
-  const donutEmpty  = donutData.length === 0;
-  const barEmpty    = dispatchBars.length === 0;
-  const revBarEmpty = reviewBars.length === 0;
+  const lineEmpty    = reviewData.length === 0 && confirmedData.length === 0;
+  const donutEmpty   = donutData.length === 0;
+  const revBarEmpty  = reviewBars.length === 0;
 
-  // Almacenes del usuario (para el selector)
   const whCodes = user?.warehouseCodes ?? [];
   const showFilter = isAdmin && whCodes.length > 1;
 
@@ -293,7 +279,7 @@ export default function DashboardScreen() {
         </View>
       )}
 
-      {/* Selector de almacén (solo admin/manager con múltiples) */}
+      {/* Selector de almacén */}
       {showFilter && (
         <View style={styles.filterRow}>
           <WarehouseChip label="Todos" active={warehouseFilter === null} onPress={() => changeWarehouse(null)} />
@@ -303,7 +289,7 @@ export default function DashboardScreen() {
         </View>
       )}
 
-      {/* ── KPI cards ───────────────────────────────────────────────────── */}
+      {/* ── KPI cards ─────────────────────────────────────────────────────── */}
       <SeccionLabel>RESUMEN DE HOY</SeccionLabel>
       <View style={styles.kpiGrid}>
         <KpiCard label="Pendientes"    value={summary.orders_pending}   icon="clipboard-clock-outline"  color={C.warn}       colorLight={C.warnLight} />
@@ -311,7 +297,6 @@ export default function DashboardScreen() {
         <KpiCard label="Órdenes hoy"   value={summary.orders_today}     icon="calendar-today"           color={C.primary}    colorLight={C.primaryLight} />
         <KpiCard label="Despachos hoy" value={summary.dispatches_today} icon="truck-fast-outline"       color={C.primaryDim} colorLight={C.primaryLight} />
       </View>
-      {/* active_users — fila completa */}
       {(isAdmin || user?.role === 'manager') && (
         <View style={[styles.activosCard, shadow.sm]}>
           <View style={[styles.activosIconBox, { backgroundColor: C.infoLight }]}>
@@ -324,7 +309,7 @@ export default function DashboardScreen() {
         </View>
       )}
 
-      {/* ── Actividad diaria ─────────────────────────────────────────────── */}
+      {/* ── Actividad diaria ──────────────────────────────────────────────── */}
       <SeccionLabel>ACTIVIDAD DE LOS ÚLTIMOS DÍAS</SeccionLabel>
       <ChartCard title="Revisiones · Confirmaciones · Despachos" empty={lineEmpty}>
         {!lineEmpty && (
@@ -371,7 +356,7 @@ export default function DashboardScreen() {
         )}
       </ChartCard>
 
-      {/* ── Órdenes por estado ───────────────────────────────────────────── */}
+      {/* ── Órdenes por estado ────────────────────────────────────────────── */}
       <SeccionLabel>ÓRDENES POR ESTADO</SeccionLabel>
       <ChartCard title="Distribución actual" empty={donutEmpty}>
         {!donutEmpty && (
@@ -396,29 +381,7 @@ export default function DashboardScreen() {
         )}
       </ChartCard>
 
-      {/* ── Despachos por operador ───────────────────────────────────────── */}
-      <SeccionLabel>DESPACHOS POR OPERADOR</SeccionLabel>
-      <ChartCard title="Completados en el período" empty={barEmpty}>
-        {!barEmpty && (
-          <BarChart
-            data={dispatchBars}
-            barWidth={40}
-            barBorderRadius={8}
-            frontColor={C.primaryDim}
-            yAxisTextStyle={{ color: C.textMuted, fontSize: 10 }}
-            xAxisLabelTextStyle={{ color: C.textMuted, fontSize: 9 }}
-            noOfSections={4}
-            width={CHART_W}
-            backgroundColor={C.surface}
-            yAxisColor="transparent"
-            xAxisColor={C.border}
-            isAnimated
-            initialSpacing={12}
-          />
-        )}
-      </ChartCard>
-
-      {/* ── Estado de despachos ─────────────────────────────────────────── */}
+      {/* ── Despachos — estado + rendimiento ─────────────────────────────── */}
       {(dispatchStatus?.length ?? 0) > 0 && (
         <>
           <SeccionLabel>ESTADO DE DESPACHOS</SeccionLabel>
@@ -430,26 +393,27 @@ export default function DashboardScreen() {
         </>
       )}
 
-      {/* ── Detalle de rendimiento por operador ─────────────────────────── */}
       {(dispatches?.length ?? 0) > 0 && (
         <>
           <SeccionLabel>RENDIMIENTO POR OPERADOR</SeccionLabel>
           <View style={[styles.tableCard, shadow.sm]}>
-            <View style={styles.tableHeader}>
-              <Text style={[styles.tableHeaderCell, { flex: 2 }]}>USUARIO</Text>
-              <Text style={styles.tableHeaderCell}>DESP.</Text>
-              <Text style={styles.tableHeaderCell}>PROM.</Text>
-              <Text style={styles.tableHeaderCell}>UNIADES</Text>
+            <View style={styles.tableCardClip}>
+              <View style={styles.tableHeader}>
+                <Text style={[styles.tableHeaderCell, { flex: 2 }]}>USUARIO</Text>
+                <Text style={styles.tableHeaderCell}>DESP.</Text>
+                <Text style={styles.tableHeaderCell}>PROM.</Text>
+                <Text style={styles.tableHeaderCell}>UNIDADES</Text>
+              </View>
+              <View style={styles.tableDivider} />
+              {dispatches.map((row, idx) => (
+                <DispatchStatsRow key={row.user_id} row={row} idx={idx} />
+              ))}
             </View>
-            <View style={styles.tableDivider} />
-            {dispatches.map((row, idx) => (
-              <DispatchStatsRow key={row.user_id} row={row} idx={idx} last={idx === dispatches.length - 1} />
-            ))}
           </View>
         </>
       )}
 
-      {/* ── Tiempo de revisión ───────────────────────────────────────────── */}
+      {/* ── Tiempo de revisión ────────────────────────────────────────────── */}
       <SeccionLabel>TIEMPO PROMEDIO DE REVISIÓN</SeccionLabel>
       <ChartCard title="Por almacén (minutos)" empty={revBarEmpty}>
         {!revBarEmpty && (
@@ -459,9 +423,11 @@ export default function DashboardScreen() {
             barWidth={28}
             barBorderRadius={6}
             frontColor={C.info}
+            labelStyle={{ color: C.textMuted, fontSize: 10 }}
             yAxisTextStyle={{ color: C.textMuted, fontSize: 10 }}
-            xAxisLabelTextStyle={{ color: C.textMuted, fontSize: 9 }}
+            noOfSections={4}
             width={CHART_W}
+            height={Math.max(reviewBars.length * 48, 80)}
             backgroundColor={C.surface}
             yAxisColor="transparent"
             xAxisColor={C.border}
@@ -470,38 +436,39 @@ export default function DashboardScreen() {
         )}
       </ChartCard>
 
-      {/* ── Actividad por operador ───────────────────────────────────────── */}
+      {/* ── Actividad por operador ────────────────────────────────────────── */}
       {opGroups.length > 0 && (
         <>
           <SeccionLabel>ACTIVIDAD POR OPERADOR</SeccionLabel>
           <View style={[styles.tableCard, shadow.sm]}>
-            <View style={styles.tableHeader}>
-              <Text style={[styles.tableHeaderCell, { flex: 2 }]}>USUARIO</Text>
-              <Text style={styles.tableHeaderCell}>ACCIONES</Text>
-              <Text style={styles.tableHeaderCell}>ERRORES</Text>
-            </View>
-            <View style={styles.tableDivider} />
-            {opGroups.map((op, idx) => (
-              <View key={op.userId}>
-                {idx > 0 && <View style={styles.tableDividerLight} />}
-                <OperatorRow op={op} />
+            <View style={styles.tableCardClip}>
+              <View style={styles.tableHeader}>
+                <Text style={[styles.tableHeaderCell, { flex: 2 }]}>USUARIO</Text>
+                <Text style={styles.tableHeaderCell}>ACCIONES</Text>
+                <Text style={styles.tableHeaderCell}>ERRORES</Text>
               </View>
-            ))}
+              <View style={styles.tableDivider} />
+              {opGroups.map((op, idx) => (
+                <OperatorRow key={op.userId} op={op} idx={idx} />
+              ))}
+            </View>
           </View>
         </>
       )}
 
-      {/* ── Sesiones activas ─────────────────────────────────────────────── */}
+      {/* ── Sesiones activas ──────────────────────────────────────────────── */}
       {sessions.length > 0 && (
         <>
           <SeccionLabel>SESIONES ACTIVAS</SeccionLabel>
           <View style={[styles.sessionsCard, shadow.sm]}>
-            {sessions.map((s, idx) => (
-              <View key={s.id}>
-                {idx > 0 && <View style={styles.tableDividerLight} />}
-                <SessionCard session={s} />
-              </View>
-            ))}
+            <View style={styles.sessionsCardClip}>
+              {sessions.map((s, idx) => (
+                <View key={s.id}>
+                  {idx > 0 && <View style={styles.tableDividerLight} />}
+                  <SessionCard session={s} />
+                </View>
+              ))}
+            </View>
           </View>
         </>
       )}
@@ -589,13 +556,16 @@ const styles = StyleSheet.create({
   activosLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5, color: C.textMuted, textTransform: 'uppercase' },
   activosVal: { fontSize: 15, fontWeight: '600', color: C.text, marginTop: 2 },
 
-  // Chart cards
+  // Chart cards — outer has shadow/borderRadius, inner clips content
   chartCard: {
     backgroundColor: C.surface,
     borderRadius: 16,
+  },
+  chartCardClip: {
+    borderRadius: 16,
+    overflow: 'hidden',
     padding: S.md,
     gap: S.md,
-    overflow: 'hidden',
   },
   chartTitle: { fontSize: 13, fontWeight: '600', color: C.textSec },
   emptyChart: { alignItems: 'center', paddingVertical: S.xl, gap: S.sm },
@@ -611,15 +581,18 @@ const styles = StyleSheet.create({
   donutRow: { flexDirection: 'row', alignItems: 'center', gap: S.base, flexWrap: 'wrap' },
   donutCenter: { fontSize: 22, fontWeight: '700', color: C.text, letterSpacing: -0.5 },
   donutCenterSub: { fontSize: 10, color: C.textMuted, fontWeight: '600', letterSpacing: 0.3 },
-  legend: { flex: 1, gap: 8 },
+  legend: { flex: 1, gap: 8, minWidth: 120 },
   legendRow: { flexDirection: 'row', alignItems: 'center', gap: S.xs },
   legendDot: { width: 9, height: 9, borderRadius: 5 },
   legendLabel: { fontSize: 12, color: C.textSec, flex: 1 },
   legendVal: { fontSize: 13, fontWeight: '700', color: C.text },
 
-  // Operators table
+  // Table cards — outer has shadow/borderRadius, inner clips rows
   tableCard: {
     backgroundColor: C.surface,
+    borderRadius: 14,
+  },
+  tableCardClip: {
     borderRadius: 14,
     overflow: 'hidden',
   },
@@ -639,6 +612,8 @@ const styles = StyleSheet.create({
   },
   tableDivider: { height: 0.5, backgroundColor: C.border },
   tableDividerLight: { height: 0.5, backgroundColor: C.border, marginHorizontal: S.base },
+
+  // Operator activity rows
   opRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -683,7 +658,7 @@ const styles = StyleSheet.create({
   dsPillTotal: { fontSize: 20, fontWeight: '700', letterSpacing: -0.5 },
   dsPillLabel: { fontSize: 10, fontWeight: '600', color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.3 },
 
-  // Dispatch stats table row
+  // Dispatch stats table rows
   dsRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -694,9 +669,12 @@ const styles = StyleSheet.create({
   dsUserId: { flex: 2, fontSize: 13, fontWeight: '600', color: C.text },
   dsStat: { flex: 1, fontSize: 13, fontWeight: '600', color: C.primaryDim, textAlign: 'right' },
 
-  // Sessions
+  // Sessions card
   sessionsCard: {
     backgroundColor: C.surface,
+    borderRadius: 14,
+  },
+  sessionsCardClip: {
     borderRadius: 14,
     overflow: 'hidden',
   },
