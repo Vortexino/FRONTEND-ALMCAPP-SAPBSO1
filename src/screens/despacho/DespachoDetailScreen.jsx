@@ -56,7 +56,7 @@ export default function DespachoDetailScreen() {
 
   const {
     dispatchActual, itemActual, estadoUI, user, todosRevisados,
-    iniciarDespacho, escanearArticulo, marcarFaltante, cancelarDespacho, resetDispatch,
+    iniciarDespacho, escanearArticulo, revertirCompletado, cancelarDespacho, resetDispatch,
   } = useDespacho();
 
   // 'preview' = mostrar info de la factura + botón "Iniciar despacho"
@@ -238,8 +238,7 @@ export default function DespachoDetailScreen() {
 
   const items = dispatchActual.invoice?.items ?? [];
   const total = items.length;
-  // "revisados" = completado + faltante — ambos son estados terminales desde la perspectiva del operario
-  const revisados = items.filter((i) => i.estado === 'completado' || i.estado === 'faltante').length;
+  const revisados = items.filter((i) => i.estado === 'completado').length;
   const progressPct = total > 0 ? Math.round((revisados / total) * 100) : 0;
 
   return (
@@ -263,6 +262,14 @@ export default function DespachoDetailScreen() {
         <View style={styles.barraWrap}>
           <View style={[styles.barraFill, { width: `${progressPct}%`, backgroundColor: progressPct === 100 ? C.success : C.primary }]} />
         </View>
+        {!todosRevisados && (
+          <View style={styles.avisoPendiente}>
+            <MaterialCommunityIcons name="clock-outline" size={13} color={C.warn} />
+            <Text style={styles.avisoTexto}>
+              {total - revisados} artículo(s) pendiente(s) · escaneá o confirmá visualmente
+            </Text>
+          </View>
+        )}
       </View>
 
       {estadoUI.error && (
@@ -279,8 +286,9 @@ export default function DespachoDetailScreen() {
           <ProductoItem
             item={item}
             sugerido={item.itemCode === itemActual}
-            onMarcarFaltante={marcarFaltante}
+            disabled={estadoUI.loading}
             onConfirmarVisual={onCodigoEscaneado}
+            onDeshacer={revertirCompletado}
           />
         )}
         contentContainerStyle={styles.lista}
@@ -429,6 +437,17 @@ const styles = StyleSheet.create({
   progresoTotal: { fontSize: 15, fontWeight: '600', color: C.textSec },
   barraWrap: { height: 4, backgroundColor: C.border, borderRadius: 4, overflow: 'hidden' },
   barraFill: { height: 4, borderRadius: 4 },
+
+  avisoPendiente: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: C.warnLight,
+    paddingHorizontal: S.sm,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  avisoTexto: { fontSize: 12, color: C.warn, fontWeight: '600', flex: 1 },
 
   errorBanner: {
     flexDirection: 'row',
